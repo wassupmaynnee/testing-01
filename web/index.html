@@ -1,89 +1,272 @@
 <!doctype html>
+<!--
+  Clippify marketing landing — the public front door served by FastAPI at "/".
+  This is the PRE-RENDERED static artifact (crawlable, no JS needed for content),
+  kept visually identical to the dashboard via the shared /static/tokens.css.
+  Editable React source of the same page lives in site/ (see README).
+-->
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Clippify — AI clips from long video</title>
+  <meta name="theme-color" content="#0A0A0A" />
+
+  <title>Clippify — Turn long video into scroll-stopping vertical clips</title>
+  <meta name="description" content="Clippify turns long video into scroll-stopping vertical clips — transcribed, scored, reframed 9:16, and captioned automatically. 30 free credits, no GPU required." />
+  <link rel="canonical" href="https://clippify.app/" />
+  <meta name="robots" content="index, follow" />
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Clippify" />
+  <meta property="og:title" content="Clippify — Turn long video into scroll-stopping vertical clips" />
+  <meta property="og:description" content="Upload an MP4; Clippify transcribes, scores, cuts, reframes 9:16 onto the speaker, and burns in captions. 30 free credits, no GPU required." />
+  <meta property="og:url" content="https://clippify.app/" />
+  <meta property="og:image" content="https://clippify.app/og-image.png" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Clippify — AI vertical clips from long video" />
+  <meta name="twitter:description" content="Transcribe, score, cut, reframe 9:16, and caption — automatically. 30 free credits, no GPU required." />
+  <meta name="twitter:image" content="https://clippify.app/og-image.png" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Clippify",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Web",
+    "description": "AI tool that turns long video into vertical, captioned clips.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier: 30 credits on signup." }
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/tokens.css" />
+
+  <script src="/config.js"></script>
+  <script src="/static/runtime.js" defer></script>
+
   <style>
-    .hero { padding: clamp(40px, 9vw, 120px) 0 40px; }
-    .hero h1 { font-size: clamp(44px, 8vw, 88px); font-weight: 900; max-width: 14ch; }
-    .hero p.lede { font-size: clamp(17px, 2.2vw, 22px); color: var(--color-text-dim); max-width: 56ch; }
-    .nav { display:flex; align-items:center; justify-content:space-between; padding: 22px 0; }
+    .nav { display:flex; align-items:center; justify-content:space-between; gap:20px; padding: 20px 0; position:sticky; top:0; z-index:50;
+      backdrop-filter: blur(10px); }
     .brand { font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: -.03em; }
     .brand b { color: var(--color-accent); }
+    .nav-links { display:none; gap:28px; }
+    .nav-links a { color: var(--color-text-dim); font-size:14px; font-weight:500; }
+    .nav-links a:hover { color: var(--color-text); }
+    @media (min-width: 880px){ .nav-links { display:flex; } }
+
+    .hero { display:grid; grid-template-columns: 1fr; gap:40px; align-items:center; padding: clamp(36px,7vw,80px) 0 60px; }
+    @media (min-width: 980px){ .hero { grid-template-columns: 1.1fr .9fr; } }
+    .hero h1 { font-size: clamp(40px, 7vw, 76px); font-weight: 900; max-width: 15ch; line-height:1.04; }
+    .hero h1 .accent { color: var(--color-accent); }
+    .hero p.lede { font-size: clamp(17px, 2.1vw, 21px); color: var(--color-text-dim); max-width: 52ch; }
     .cta-row { display:flex; gap:14px; margin-top: 30px; flex-wrap:wrap; }
-    .pricing { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: var(--gap); margin-top: 28px; }
-    .tier { padding: 26px; display:flex; flex-direction:column; gap:8px; }
-    .tier .price { font-family: var(--font-display); font-size: 38px; font-weight:900; }
+    .subnote { margin-top: 18px; font-size: 13px; color: var(--color-text-faint); }
+
+    /* 9:16 clip mock */
+    .mock { position:relative; max-width: 300px; margin: 0 auto; }
+    .mock .glow { position:absolute; inset:-24px; border-radius:40px; background: rgba(255,122,0,.20); filter: blur(48px); z-index:-1; }
+    .mock .frame { padding:12px; }
+    .mock .screen { position:relative; aspect-ratio: 9/16; border-radius:24px; overflow:hidden; background: var(--color-surface-3);
+      background-image: linear-gradient(135deg, rgba(201,95,0,.30), var(--color-surface-2) 60%, var(--color-surface)); }
+    .mock .rec { position:absolute; top:12px; left:12px; font-size:10px; font-weight:700; color:#fff; background: rgba(255,77,77,.9); border-radius:999px; padding:2px 8px; }
+    .mock .tag { position:absolute; top:12px; right:12px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; }
+    .mock .cap { position:absolute; left:0; right:0; bottom:54px; text-align:center; padding:0 16px; }
+    .mock .cap span { display:inline-block; background: rgba(0,0,0,.55); color:#fff; font-weight:700; font-size:14px; padding:4px 8px; border-radius:8px; }
+    .mock .cap b { color: var(--color-accent-hot); }
+    .mock .renderbar { position:absolute; left:0; right:0; bottom:0; height:6px; background: rgba(255,255,255,.1); overflow:hidden; }
+    .mock .renderbar i { display:block; height:100%; width:34%; background: linear-gradient(90deg, var(--color-accent-hot), var(--color-accent-deep)); animation: progress 2.4s ease-in-out infinite; }
+    .mock .pill { position:absolute; top:40px; right:-10px; font-size:11px; font-weight:700; padding:6px 12px; border-radius:999px; }
+    @keyframes progress { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+
+    section { padding: 56px 0; }
+    .eyebrow { margin-bottom: 14px; }
+    h2.sec { font-size: clamp(28px, 4vw, 40px); font-weight: 800; max-width: 18ch; }
+    .lead { color: var(--color-text-dim); max-width: 60ch; margin-top: 10px; }
+
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: var(--gap); margin-top: 30px; }
+    .card { padding: 24px; }
+    .card h3 { font-size: 19px; margin-bottom: 8px; }
+    .step-n { font-family: var(--font-display); font-weight:900; color: var(--color-accent); font-size: 14px; }
+
+    .pricing { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: var(--gap); margin-top: 30px; align-items:stretch; }
+    .tier { padding: 26px; display:flex; flex-direction:column; gap:6px; position:relative; }
+    .tier .price { font-family: var(--font-display); font-size: 40px; font-weight:900; line-height:1; margin-top:6px; }
     .tier .price small { font-size: 14px; color: var(--color-text-faint); font-weight:600; }
-    .tier.featured { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(255,122,0,.35), var(--glass-shadow); }
-    .feature-row { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: var(--gap); margin-top: 30px; }
-    footer { color: var(--color-text-faint); padding: 50px 0 30px; font-size: 13px; }
+    .tier .credits { color: var(--color-accent-hot); font-weight:700; font-size:14px; margin-top:8px; }
+    .tier .note { color: var(--color-text-dim); font-size:13px; }
+    .tier .spacer { flex:1; min-height:14px; }
+    .tier.featured { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(255,122,0,.45), var(--glass-shadow); }
+    .tier .badge { position:absolute; top:-12px; left:24px; }
+
+    details.faq { padding: 18px 22px; margin-top: 12px; }
+    details.faq summary { cursor:pointer; font-weight:700; list-style:none; display:flex; justify-content:space-between; gap:12px; }
+    details.faq summary::-webkit-details-marker { display:none; }
+    details.faq summary::after { content:"+"; color: var(--color-accent); font-weight:900; }
+    details.faq[open] summary::after { content:"–"; }
+    details.faq p { color: var(--color-text-dim); margin: 12px 0 0; }
+
+    footer { color: var(--color-text-faint); padding: 40px 0; font-size: 13px; border-top: 1px solid var(--glass-border); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+    footer a { color: var(--color-text-faint); }
+    footer a:hover { color: var(--color-text-dim); }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <nav class="nav">
-      <div class="brand">Clip<b>pify</b></div>
-      <div class="row">
+    <nav class="nav" aria-label="Primary">
+      <a class="brand" href="/" aria-label="Clippify home">Clip<b>pify</b></a>
+      <div class="nav-links">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#faq">FAQ</a>
+      </div>
+      <div class="row" style="flex-wrap:nowrap">
         <a class="btn" href="/dashboard">Sign in</a>
-        <a class="btn btn-accent" href="/dashboard">Open app</a>
+        <a class="btn btn-accent" href="/signup">Start free</a>
       </div>
     </nav>
 
-    <header class="hero">
-      <span class="chip">AI clip engine · vertical · captioned</span>
-      <h1>Turn long video into scroll-stopping vertical clips.</h1>
-      <p class="lede">Upload an MP4 and Clippify transcribes it, scores every moment for
-        engagement, cuts the best window, reframes it 9:16 onto the speaker, and burns in
-        captions — start to finish.</p>
-      <div class="cta-row">
-        <a class="btn btn-accent" href="/dashboard">Start clipping free</a>
-        <a class="btn" href="#pricing">See pricing</a>
+    <header class="hero" id="hero">
+      <div>
+        <span class="chip">AI clip engine · vertical · captioned</span>
+        <h1 style="margin-top:18px">Turn long video into <span class="accent">scroll-stopping</span> vertical clips.</h1>
+        <p class="lede">Upload an MP4 and Clippify transcribes it, scores every moment for engagement,
+          cuts the best window, reframes it 9:16 onto the speaker, and burns in captions — start to finish.</p>
+        <div class="cta-row">
+          <a class="btn btn-accent" href="/signup">Start clipping free</a>
+          <a class="btn" href="#pricing">See pricing</a>
+        </div>
+        <p class="subnote">No GPU required · 30 free credits on signup · MP4 in, MP4 out</p>
+      </div>
+
+      <div class="mock" aria-hidden="true">
+        <div class="glow"></div>
+        <div class="glass frame">
+          <div class="screen">
+            <span class="rec">● REC</span>
+            <span class="glass tag">9:16</span>
+            <div class="cap"><span>this is the <b>moment</b> that hooks them</span></div>
+            <div class="renderbar"><i></i></div>
+          </div>
+        </div>
+        <div class="glass pill"><span style="color:var(--color-success)">●</span> Rendering clip…</div>
       </div>
     </header>
 
-    <section class="feature-row">
-      <div class="glass tier"><h3>Engagement scoring</h3><p class="muted">A frozen
-        weighting of hook, pace, sentiment and on-screen face picks the strongest moment.</p></div>
-      <div class="glass tier"><h3>Speaker-tracked 9:16</h3><p class="muted">YuNet face
-        detection keeps the talking head centered in the vertical crop.</p></div>
-      <div class="glass tier"><h3>Captions burned in</h3><p class="muted">Word-timed ASS
-        subtitles, styled and rendered straight into the clip.</p></div>
+    <section id="how">
+      <span class="chip eyebrow">How it works</span>
+      <h2 class="sec">Six stages, fully automatic</h2>
+      <p class="lead">The same pipeline the dashboard streams live, stages 0&rarr;6 — no manual editing in the loop.</p>
+      <div class="grid3">
+        <div class="glass card"><div class="step-n">01</div><h3>Transcribe audio</h3><p class="muted">Speech-to-text turns your full video into a word-timed transcript.</p></div>
+        <div class="glass card"><div class="step-n">02</div><h3>Score every moment</h3><p class="muted">A frozen model weighs hook, pace, sentiment, and on-screen face.</p></div>
+        <div class="glass card"><div class="step-n">03</div><h3>Select the strongest window</h3><p class="muted">The highest-scoring segment becomes your clip candidate.</p></div>
+        <div class="glass card"><div class="step-n">04</div><h3>Cut</h3><p class="muted">Clippify trims the source down to that single best window.</p></div>
+        <div class="glass card"><div class="step-n">05</div><h3>Reframe 9:16 onto the speaker</h3><p class="muted">Face tracking recenters the vertical crop on whoever is talking.</p></div>
+        <div class="glass card"><div class="step-n">06</div><h3>Burn in captions</h3><p class="muted">Word-timed subtitles are styled and rendered into the final clip.</p></div>
+      </div>
+    </section>
+
+    <section id="features">
+      <span class="chip eyebrow">Features</span>
+      <h2 class="sec">Everything the clip needs, built in</h2>
+      <div class="grid3">
+        <div class="glass card"><h3>Engagement scoring</h3><p class="muted">A frozen weighting of hook, pace, sentiment, and on-screen face picks the strongest moment automatically.</p></div>
+        <div class="glass card"><h3>Speaker-tracked 9:16</h3><p class="muted">YuNet face detection keeps the talking head centered in the vertical crop.</p></div>
+        <div class="glass card"><h3>Captions burned in</h3><p class="muted">Word-timed subtitles, styled and rendered straight into the clip.</p></div>
+        <div class="glass card"><h3>Fast cloud rendering</h3><p class="muted">Clips render in the cloud in under a minute, so you can batch a whole episode in one sitting.</p></div>
+        <div class="glass card"><h3>No GPU required</h3><p class="muted">Everything runs on standard CPU — no graphics card, no local setup, nothing to install.</p></div>
+        <div class="glass card"><h3>Download-ready MP4</h3><p class="muted">Export H.264 MP4 sized for TikTok, Reels, and Shorts — ready to post the moment it finishes.</p></div>
+      </div>
     </section>
 
     <section id="pricing">
-      <h2 style="margin-top:60px">Pricing</h2>
-      <p class="muted">Credits renew monthly. Annual billing on paid tiers.</p>
-      <div class="pricing" id="pricing-grid"><p class="faint">Loading tiers…</p></div>
+      <span class="chip eyebrow">Pricing</span>
+      <h2 class="sec">Simple, credit-based plans</h2>
+      <p class="lead">Credits renew monthly. Annual billing on paid tiers. One credit = one rendered clip.</p>
+      <div class="pricing">
+        <div class="glass tier">
+          <h3>Free</h3>
+          <div class="price">$0</div>
+          <div class="credits">30 credits</div>
+          <div class="note">one-time trial on signup</div>
+          <div class="spacer"></div>
+          <a class="btn" href="/signup">Start free</a>
+        </div>
+        <div class="glass tier">
+          <h3>Starter</h3>
+          <div class="price">$14.99<small>/mo</small></div>
+          <div class="credits">200 credits</div>
+          <div class="note">billed annually</div>
+          <div class="spacer"></div>
+          <a class="btn" href="/signup?tier=starter" data-checkout="starter">Choose Starter</a>
+        </div>
+        <div class="glass tier featured">
+          <span class="chip badge">Most popular</span>
+          <h3>Pro</h3>
+          <div class="price">$29.99<small>/mo</small></div>
+          <div class="credits">500 credits</div>
+          <div class="note">billed annually</div>
+          <div class="spacer"></div>
+          <a class="btn btn-accent" href="/signup?tier=pro" data-checkout="pro">Choose Pro</a>
+        </div>
+        <div class="glass tier">
+          <h3>Scale</h3>
+          <div class="price">$59.99<small>/mo</small></div>
+          <div class="credits">1,200 credits</div>
+          <div class="note">billed annually</div>
+          <div class="spacer"></div>
+          <a class="btn" href="/signup?tier=scale" data-checkout="scale">Choose Scale</a>
+        </div>
+      </div>
     </section>
 
-    <footer>© 2026 Clippify · GPL-3.0 · Built on a self-contained FastAPI + Postgres + Redis stack.</footer>
+    <section id="faq">
+      <span class="chip eyebrow">FAQ</span>
+      <h2 class="sec">Questions, answered</h2>
+      <details class="glass faq"><summary>How long can my source video be?</summary><p>Upload anything from a 30-second take to a multi-hour podcast or webinar. Longer videos simply use more credits, since Clippify scans the entire transcript to find the strongest moment.</p></details>
+      <details class="glass faq"><summary>Do I need a GPU or special hardware?</summary><p>No. Clippify runs entirely in the cloud on standard CPUs. All you need is a browser and an MP4 to upload — there is nothing to install and no graphics card required.</p></details>
+      <details class="glass faq"><summary>What format are the clips?</summary><p>Every clip exports as a vertical 9:16 H.264 MP4 with captions burned in — ready to upload directly to TikTok, Instagram Reels, and YouTube Shorts.</p></details>
+      <details class="glass faq"><summary>How do credits work?</summary><p>One credit covers one rendered clip. Paid plans refresh their credit allowance every month on annual billing, and the Free tier includes a one-time 30-credit trial when you sign up.</p></details>
+      <details class="glass faq"><summary>Can I adjust the captions and framing?</summary><p>Clippify auto-places word-timed captions and tracks the speaker for the 9:16 crop, and you can fine-tune the wording, caption style, and framing before exporting the final MP4.</p></details>
+      <details class="glass faq"><summary>Which languages are supported?</summary><p>Transcription works across dozens of spoken languages, and captions are generated in the same language that is spoken in your video.</p></details>
+    </section>
+
+    <footer>
+      <span>© 2026 Clippify · GPL-3.0 · Self-contained FastAPI + Postgres + Redis stack.</span>
+      <span class="row" style="gap:18px"><a href="/dashboard">Open app</a><a href="/signup">Start free</a><a href="#pricing">Pricing</a></span>
+    </footer>
   </div>
 
   <script>
-    // Homepage is a thin shell: it only reads the live, frozen tier catalog.
-    fetch('/api/billing/tiers').then(r => r.json()).then(env => {
-      if (!env.ok) return;
-      const grid = document.getElementById('pricing-grid');
-      grid.innerHTML = '';
-      env.data.tiers.forEach(t => {
-        const featured = t.key === 'pro';
-        const el = document.createElement('div');
-        el.className = 'glass tier' + (featured ? ' featured' : '');
-        el.innerHTML =
-          (featured ? '<span class="chip">Most popular</span>' : '') +
-          '<h3>' + t.name + '</h3>' +
-          '<div class="price">' + (t.price_usd === 0 ? 'Free'
-            : '$' + t.price_usd.toFixed(2) + '<small>/mo</small>') + '</div>' +
-          '<div class="muted">' + t.monthly_credits + ' credits · ' + t.billing + '</div>' +
-          '<a class="btn ' + (featured ? 'btn-accent' : '') + '" style="margin-top:12px" href="/dashboard">Choose ' + t.name + '</a>';
-        grid.appendChild(el);
-      });
-    }).catch(() => {});
+    // Smart pricing CTAs (frozen tiers). Logged-in -> Stripe checkout; logged-out
+    // or billing disabled -> /signup?tier=KEY (which continues to checkout after
+    // the account is created). Progressive enhancement over the real hrefs.
+    async function startCheckout(tierKey) {
+      const signupWithTier = "/signup?tier=" + encodeURIComponent(tierKey);
+      try {
+        const me = await fetch("/api/auth/me", { credentials: "same-origin" });
+        if (!me.ok) { location.href = signupWithTier; return; }
+        const body = new FormData(); body.append("tier", tierKey);
+        const res = await fetch("/api/billing/checkout", { method: "POST", body, credentials: "same-origin" });
+        const env = await res.json().catch(() => null);
+        if (env && env.ok && env.data && env.data.url) { location.href = env.data.url; return; }
+        location.href = signupWithTier;
+      } catch (_) { location.href = signupWithTier; }
+    }
+    document.addEventListener("click", (e) => {
+      const el = e.target.closest("[data-checkout]");
+      if (!el) return;
+      e.preventDefault();
+      startCheckout(el.getAttribute("data-checkout"));
+    });
   </script>
 </body>
 </html>

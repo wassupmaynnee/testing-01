@@ -55,8 +55,12 @@ function renderUser() {
   $("view-app").classList.toggle("hidden", !AppState.user);
   const bar = $("userbar");
   if (AppState.user) {
+    const tier = AppState.user.tier ? AppState.user.tier[0].toUpperCase() + AppState.user.tier.slice(1) : "Free";
     bar.innerHTML =
       `<span class="muted" style="margin-right:12px">${AppState.user.email}</span>` +
+      `<span class="chip" style="margin-right:10px">${tier}</span>` +
+      `<a class="btn" href="/#pricing">Upgrade</a>` +
+      `<button class="btn" data-action="billing-portal">Billing</button>` +
       `<button class="btn" data-action="logout">Sign out</button>`;
     $("credits").textContent = AppState.user.credits;
   } else {
@@ -202,6 +206,15 @@ const actions = {
   },
 
   async "open-job"(el) { await openJob(el.dataset.job); },
+
+  async "billing-portal"() {
+    try {
+      const data = await api("/api/billing/portal", { method: "POST" });
+      if (data && data.url) { window.location.href = data.url; }
+    } catch (e) {
+      toast(e.code === "deferred" ? "Billing isn't enabled yet." : e.message, "err");
+    }
+  },
 
   download() { /* href on the anchor handles the actual download */ },
 };

@@ -1,0 +1,8 @@
+# Clippify — public marketing pages are crawlable; the app + API are not.
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /signup
+Disallow: /api/
+
+Sitemap: https://clippify.app/sitemap.xml
