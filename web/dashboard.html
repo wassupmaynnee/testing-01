@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clippify — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <style>
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding: 20px 0; }
+    .brand { font-family: var(--font-display); font-weight: 900; font-size: 20px; letter-spacing:-.03em; }
+    .brand b { color: var(--color-accent); }
+    .panel { padding: 26px; }
+    .grid { display:grid; grid-template-columns: 1.2fr 1fr; gap: var(--gap); align-items:start; }
+    @media (max-width: 860px){ .grid { grid-template-columns: 1fr; } }
+    .dropzone { border: 1.5px dashed var(--glass-border); border-radius: var(--radius);
+      padding: 40px; text-align:center; cursor:pointer; transition: border-color .2s; }
+    .dropzone:hover { border-color: var(--color-accent); }
+    .credits { font-size:13px; }
+    .credits b { color: var(--color-accent); }
+    .joblist { display:flex; flex-direction:column; gap:10px; max-height: 320px; overflow:auto; }
+    .jobrow { display:flex; justify-content:space-between; align-items:center; padding:12px 14px;
+      border-radius: var(--radius-sm); background: var(--glass-bg); border:1px solid var(--glass-border); cursor:pointer; }
+    .jobrow:hover { border-color: rgba(255,255,255,.22); }
+    .status-tag { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em;
+      padding:4px 9px; border-radius:999px; }
+    .status-running { color: var(--color-accent); background: rgba(255,122,0,.12); }
+    .status-completed { color: var(--color-success); background: rgba(46,204,113,.12); }
+    .status-failed { color: var(--color-error); background: rgba(255,77,77,.12); }
+    .status-queued { color: var(--color-text-dim); background: rgba(255,255,255,.06); }
+    video { width:100%; border-radius: var(--radius-sm); background:#000; aspect-ratio: 9/16; max-height: 60vh; }
+    .signals { display:grid; grid-template-columns: repeat(4,1fr); gap:8px; margin-top:10px; font-size:12px; text-align:center; }
+    .signals div b { display:block; font-size:18px; color: var(--color-accent); font-family: var(--font-display); }
+    .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+      padding:12px 18px; border-radius: var(--radius-sm); font-size:14px; z-index:50; }
+    .toast.err { background: rgba(255,77,77,.15); border:1px solid var(--color-error); color:#ffd6d6; }
+    .toast.ok { background: rgba(46,204,113,.15); border:1px solid var(--color-success); color:#d6ffe6; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">Clip<b>pify</b> · Dashboard</div>
+      <div id="userbar" class="row" style="align-items:center"></div>
+    </div>
+
+    <!-- LOGIN VIEW -->
+    <section id="view-login" class="glass panel" style="max-width:420px; margin: 6vh auto;">
+      <h2>Sign in</h2>
+      <p class="muted">Use the seeded dev account to run the demo.</p>
+      <div class="field"><label>Email</label>
+        <input id="login-email" type="email" value="demo@clippify.dev" autocomplete="username" /></div>
+      <div class="field"><label>Password</label>
+        <input id="login-password" type="password" value="clippify-demo" autocomplete="current-password" /></div>
+      <button class="btn btn-accent" data-action="login" style="width:100%">Sign in</button>
+    </section>
+
+    <!-- APP VIEW -->
+    <section id="view-app" class="hidden">
+      <div class="grid">
+        <div style="display:flex; flex-direction:column; gap:var(--gap)">
+          <div class="glass panel">
+            <div class="row" style="justify-content:space-between; align-items:center">
+              <h2 style="margin:0">New clip</h2>
+              <span class="credits muted">Credits: <b id="credits">–</b></span>
+            </div>
+            <p class="muted">Upload a short MP4 (≤ 10 min). One credit per clip.</p>
+            <div class="dropzone" data-action="choose-file">
+              <div style="font-size:34px">⬆</div>
+              <div><b>Click to choose an MP4</b></div>
+              <div class="faint" id="filename">No file selected</div>
+            </div>
+            <input id="file-input" type="file" accept="video/mp4,video/*" class="hidden" />
+            <button class="btn btn-accent" data-action="upload" id="upload-btn" disabled
+              style="width:100%; margin-top:14px">Generate clip</button>
+          </div>
+
+          <div class="glass panel">
+            <h3 style="margin-top:0">Progress</h3>
+            <div class="bar" style="margin-bottom:16px"><i id="progbar"></i></div>
+            <div class="stepper" id="stepper"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:var(--gap)">
+          <div class="glass panel">
+            <h3 style="margin-top:0">Your clip</h3>
+            <div id="clip-empty" class="faint">Your finished vertical clip will appear here.</div>
+            <div id="clip-box" class="hidden">
+              <video id="clip-video" controls playsinline></video>
+              <div class="row" style="justify-content:space-between; align-items:center; margin-top:12px">
+                <span class="chip" id="clip-score">score –</span>
+                <a class="btn btn-accent" id="download-link" data-action="download" download>Download</a>
+              </div>
+              <div class="signals" id="clip-signals"></div>
+            </div>
+          </div>
+
+          <div class="glass panel">
+            <h3 style="margin-top:0">Recent jobs</h3>
+            <div class="joblist" id="joblist"><p class="faint">No jobs yet.</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

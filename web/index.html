@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Clippify — AI clips from long video</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <style>
+    .hero { padding: clamp(40px, 9vw, 120px) 0 40px; }
+    .hero h1 { font-size: clamp(44px, 8vw, 88px); font-weight: 900; max-width: 14ch; }
+    .hero p.lede { font-size: clamp(17px, 2.2vw, 22px); color: var(--color-text-dim); max-width: 56ch; }
+    .nav { display:flex; align-items:center; justify-content:space-between; padding: 22px 0; }
+    .brand { font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: -.03em; }
+    .brand b { color: var(--color-accent); }
+    .cta-row { display:flex; gap:14px; margin-top: 30px; flex-wrap:wrap; }
+    .pricing { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: var(--gap); margin-top: 28px; }
+    .tier { padding: 26px; display:flex; flex-direction:column; gap:8px; }
+    .tier .price { font-family: var(--font-display); font-size: 38px; font-weight:900; }
+    .tier .price small { font-size: 14px; color: var(--color-text-faint); font-weight:600; }
+    .tier.featured { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(255,122,0,.35), var(--glass-shadow); }
+    .feature-row { display:grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: var(--gap); margin-top: 30px; }
+    footer { color: var(--color-text-faint); padding: 50px 0 30px; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <nav class="nav">
+      <div class="brand">Clip<b>pify</b></div>
+      <div class="row">
+        <a class="btn" href="/dashboard">Sign in</a>
+        <a class="btn btn-accent" href="/dashboard">Open app</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <span class="chip">AI clip engine · vertical · captioned</span>
+      <h1>Turn long video into scroll-stopping vertical clips.</h1>
+      <p class="lede">Upload an MP4 and Clippify transcribes it, scores every moment for
+        engagement, cuts the best window, reframes it 9:16 onto the speaker, and burns in
+        captions — start to finish.</p>
+      <div class="cta-row">
+        <a class="btn btn-accent" href="/dashboard">Start clipping free</a>
+        <a class="btn" href="#pricing">See pricing</a>
+      </div>
+    </header>
+
+    <section class="feature-row">
+      <div class="glass tier"><h3>Engagement scoring</h3><p class="muted">A frozen
+        weighting of hook, pace, sentiment and on-screen face picks the strongest moment.</p></div>
+      <div class="glass tier"><h3>Speaker-tracked 9:16</h3><p class="muted">YuNet face
+        detection keeps the talking head centered in the vertical crop.</p></div>
+      <div class="glass tier"><h3>Captions burned in</h3><p class="muted">Word-timed ASS
+        subtitles, styled and rendered straight into the clip.</p></div>
+    </section>
+
+    <section id="pricing">
+      <h2 style="margin-top:60px">Pricing</h2>
+      <p class="muted">Credits renew monthly. Annual billing on paid tiers.</p>
+      <div class="pricing" id="pricing-grid"><p class="faint">Loading tiers…</p></div>
+    </section>
+
+    <footer>© 2026 Clippify · GPL-3.0 · Built on a self-contained FastAPI + Postgres + Redis stack.</footer>
+  </div>
+
+  <script>
+    // Homepage is a thin shell: it only reads the live, frozen tier catalog.
+    fetch('/api/billing/tiers').then(r => r.json()).then(env => {
+      if (!env.ok) return;
+      const grid = document.getElementById('pricing-grid');
+      grid.innerHTML = '';
+      env.data.tiers.forEach(t => {
+        const featured = t.key === 'pro';
+        const el = document.createElement('div');
+        el.className = 'glass tier' + (featured ? ' featured' : '');
+        el.innerHTML =
+          (featured ? '<span class="chip">Most popular</span>' : '') +
+          '<h3>' + t.name + '</h3>' +
+          '<div class="price">' + (t.price_usd === 0 ? 'Free'
+            : '$' + t.price_usd.toFixed(2) + '<small>/mo</small>') + '</div>' +
+          '<div class="muted">' + t.monthly_credits + ' credits · ' + t.billing + '</div>' +
+          '<a class="btn ' + (featured ? 'btn-accent' : '') + '" style="margin-top:12px" href="/dashboard">Choose ' + t.name + '</a>';
+        grid.appendChild(el);
+      });
+    }).catch(() => {});
+  </script>
+</body>
+</html>

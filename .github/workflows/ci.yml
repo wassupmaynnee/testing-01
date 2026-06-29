@@ -1,0 +1,80 @@
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  lint-and-imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+
+      - name: Install dependencies (frozen FastAPI pin)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install ruff
+
+      - name: Lint
+        run: ruff check saas
+
+      - name: Verify FastAPI pin holds
+        run: |
+          python - <<'PY'
+          import fastapi
+          major, minor = map(int, fastapi.__version__.split(".")[:2])
+          assert (major, minor) == (0, 115), f"FastAPI pin violated: {fastapi.__version__}"
+          print("FastAPI pin OK:", fastapi.__version__)
+          PY
+
+      - name: Verify every sub-router survived include_router()
+        run: |
+          python - <<'PY'
+          from saas.main import app
+          prefixes = {getattr(r, "path", "") for r in app.routes}
+          required = ["/api/auth/login", "/api/jobs", "/api/clips/{clip_id}",
+                      "/api/stream/{job_id}", "/api/billing/tiers", "/api/publish/{clip_id}",
+                      "/health"]
+          have = {r.path for r in app.routes}
+          missing = [p for p in required if p not in have]
+          assert not missing, f"vanished routes: {missing}"
+          print("All routers mounted:", len(have), "routes")
+          PY
+
+  compose-and-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed .env from template
+        run: cp .env.example .env
+
+      - name: Validate compose stack
+        run: docker compose -f docker-compose.saas.yml config
+
+      - name: Build and boot the stack
+        run: docker compose -f docker-compose.saas.yml up -d --build
+
+      - name: Health smoke test on :8011
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8011/health; then
+              echo "healthy"; exit 0
+            fi
+            echo "waiting ($i)..."; sleep 5
+          done
+          echo "::group::api logs"; docker compose -f docker-compose.saas.yml logs api; echo "::endgroup::"
+          exit 1
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f docker-compose.saas.yml down -v

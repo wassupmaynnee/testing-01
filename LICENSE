@@ -1,0 +1,22 @@
+Clippify SaaS
+Copyright (C) 2026 Clippify Contributors
+
+SPDX-License-Identifier: GPL-3.0-only
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+WHY GPL-3.0: this project bundles and links FFmpeg-derived components
+(including a GPL-licensed FFmpeg build for the NVENC cut, YuNet reframe, and
+ASS subtitle burn-in render path). That GPL obligation propagates to the whole
+work, so Clippify SaaS is distributed under GPL-3.0-only. Do not strip license
+headers from any ported FFmpeg-derived source file.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+The complete text of the GNU General Public License version 3 is available at
+<https://www.gnu.org/licenses/gpl-3.0.txt>. Distributors MUST include the full
+license text as part of any binary or source distribution of this work.

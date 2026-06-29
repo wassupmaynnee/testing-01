@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# Env & secrets — NEVER commit real values
+.env
+*.pem
+*.key
+
+# Runtime data (uploads / rendered clips / pipeline checkpoints)
+/data/uploads/*
+/data/clips/*
+/data/checkpoints/*
+!/data/uploads/.gitkeep
+!/data/clips/.gitkeep
+!/data/checkpoints/.gitkeep
+
+# Models cache (YuNet ONNX, whisper weights)
+/models/
+*.onnx
+
+# Node / Vite (marketing site under site/)
+node_modules/
+site/dist/
+npm-debug.log*
+*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,19 @@
+# --- Web framework ---
+# FROZEN PIN: >=0.138 silently drops include_router() sub-routes. Do not bump.
+fastapi>=0.115,<0.116
+uvicorn[standard]>=0.30,<0.31
+python-multipart>=0.0.9
+pydantic-settings>=2.4,<3
+
+# --- Data layer (PostgreSQL 16 system of record) ---
+SQLAlchemy>=2.0,<2.1
+alembic>=1.13,<2
+psycopg[binary]>=3.2,<4
+
+# --- Broker / SSE transport ---
+redis>=5.0,<6
+
+# --- Pipeline / render ---
+faster-whisper>=1.0,<2
+opencv-python-headless>=4.9,<5
+numpy>=1.26,<3

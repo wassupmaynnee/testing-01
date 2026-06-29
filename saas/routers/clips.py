@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+
+from ..db import get_db
+from ..deps import current_user
+from ..models import Clip, Job, User
+from ..responses import err, ok
+
+router = APIRouter(prefix="/api/clips", tags=["clips"])
+
+
+def _owned_clip(clip_id: str, user: User, db: Session) -> Clip | None:
+    clip = db.get(Clip, clip_id)
+    if not clip:
+        return None
+    job = db.get(Job, clip.job_id)
+    if not job or job.user_id != user.id:
+        return None
+    return clip
+
+
+@router.get("/{clip_id}")
+def clip_meta(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    clip = _owned_clip(clip_id, user, db)
+    if not clip:
+        return err("not_found", "Clip not found.", status_code=404)
+    return ok({
+        "id": clip.id, "title": clip.title, "score": round(clip.score, 4),
+        "startS": clip.start_s, "endS": clip.end_s,
+        "fileUrl": f"/api/clips/{clip.id}/file",
+        "downloadUrl": f"/api/clips/{clip.id}/download",
+    })
+
+
+@router.get("/{clip_id}/file")
+def clip_file(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    clip = _owned_clip(clip_id, user, db)
+    if not clip or not Path(clip.file_path).exists():
+        return err("not_found", "Clip file not found.", status_code=404)
+    return FileResponse(clip.file_path, media_type="video/mp4")
+
+
+@router.get("/{clip_id}/download")
+def clip_download(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    clip = _owned_clip(clip_id, user, db)
+    if not clip or not Path(clip.file_path).exists():
+        return err("not_found", "Clip file not found.", status_code=404)
+    return FileResponse(clip.file_path, media_type="video/mp4",
+                        filename=f"{clip.title or 'clip'}.mp4")

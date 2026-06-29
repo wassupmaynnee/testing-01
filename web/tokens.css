@@ -1,0 +1,146 @@
+/* ============================================================================
+   Clippify — unified design tokens. SINGLE source of truth for branding,
+   shared by index.html (homepage) and dashboard.html (app shell).
+   Modern Dark Cinema + Glassmorphism.
+   ========================================================================== */
+:root {
+  /* --- Core palette --- */
+  --color-surface:        #0A0A0A;   /* heavy near-black */
+  --color-surface-2:      #111114;
+  --color-surface-3:      #17171c;
+  --color-accent:         #FF7A00;   /* single high-contrast neon orange */
+  --color-accent-hot:     #ff9233;
+  --color-accent-deep:    #c95f00;
+
+  /* --- Text --- */
+  --color-text:           #f5f5f7;
+  --color-text-dim:       #a9a9b2;
+  --color-text-faint:     #6c6c78;
+
+  /* --- Glass --- */
+  --glass-bg:             rgba(255, 255, 255, 0.045);
+  --glass-bg-strong:      rgba(255, 255, 255, 0.07);
+  --glass-border:         rgba(255, 255, 255, 0.10);
+  --glass-blur:           18px;
+  --glass-shadow:         0 24px 60px -20px rgba(0, 0, 0, 0.8);
+
+  /* --- State --- */
+  --color-success:        #2ecc71;
+  --color-error:          #ff4d4d;
+  --color-track:          rgba(255, 255, 255, 0.08);
+
+  /* --- Typography --- */
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body:    "Inter", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --tracking-display: -0.02em;
+
+  /* --- Structure --- */
+  --radius:       18px;
+  --radius-sm:    12px;
+  --pad:          clamp(20px, 4vw, 48px);   /* generous structural padding */
+  --gap:          20px;
+  --maxw:         1180px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background:
+    radial-gradient(1100px 540px at 78% -8%, rgba(255, 122, 0, 0.16), transparent 60%),
+    radial-gradient(800px 480px at 8% 4%, rgba(255, 122, 0, 0.06), transparent 55%),
+    var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-display);
+  letter-spacing: var(--tracking-display);
+  line-height: 1.02;
+  margin: 0 0 0.4em;
+  font-weight: 800;
+}
+
+a { color: var(--color-accent); text-decoration: none; }
+
+.wrap { max-width: var(--maxw); margin: 0 auto; padding: var(--pad); }
+
+/* --- Glass card --- */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  box-shadow: var(--glass-shadow);
+}
+
+/* --- Buttons --- */
+.btn {
+  font: 600 15px/1 var(--font-body);
+  padding: 13px 22px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg-strong);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: transform .12s ease, background .2s ease, border-color .2s ease;
+}
+.btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.22); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.btn-accent {
+  background: linear-gradient(180deg, var(--color-accent-hot), var(--color-accent-deep));
+  border-color: var(--color-accent);
+  color: #160a00;
+  font-weight: 800;
+  box-shadow: 0 10px 30px -10px rgba(255, 122, 0, 0.6);
+}
+.btn-accent:hover { background: linear-gradient(180deg, #ffa64d, var(--color-accent)); }
+
+/* --- Forms --- */
+.field { width: 100%; margin-bottom: 14px; }
+.field label { display:block; font-size:13px; color: var(--color-text-dim); margin-bottom:6px; }
+.field input {
+  width: 100%; padding: 13px 14px; border-radius: var(--radius-sm);
+  background: rgba(0,0,0,.35); border: 1px solid var(--glass-border);
+  color: var(--color-text); font-size: 15px;
+}
+.field input:focus { outline: none; border-color: var(--color-accent); }
+
+/* --- Pills / chips --- */
+.chip {
+  display:inline-flex; align-items:center; gap:6px;
+  font-size: 12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+  color: var(--color-accent); background: rgba(255,122,0,.10);
+  border: 1px solid rgba(255,122,0,.30); padding: 6px 12px; border-radius: 999px;
+}
+
+/* --- Progress stepper (SSE → STEP_LABELS 0..6) --- */
+.stepper { display:flex; flex-direction:column; gap:10px; }
+.step { display:flex; align-items:center; gap:12px; color: var(--color-text-faint); }
+.step .dot {
+  width: 26px; height: 26px; border-radius: 50%; flex: none;
+  display:grid; place-items:center; font-size:13px; font-weight:800;
+  background: var(--color-track); border: 1px solid var(--glass-border);
+}
+.step.active { color: var(--color-text); }
+.step.active .dot { background: rgba(255,122,0,.18); border-color: var(--color-accent); color: var(--color-accent); }
+.step.done { color: var(--color-text-dim); }
+.step.done .dot { background: var(--color-accent); border-color: var(--color-accent); color:#160a00; }
+
+.bar { height: 8px; border-radius: 999px; background: var(--color-track); overflow: hidden; }
+.bar > i { display:block; height:100%; width:0;
+  background: linear-gradient(90deg, var(--color-accent-deep), var(--color-accent-hot));
+  transition: width .4s ease; }
+
+.muted { color: var(--color-text-dim); }
+.faint { color: var(--color-text-faint); }
+.hidden { display: none !important; }
+.row { display:flex; gap: var(--gap); flex-wrap: wrap; }
+.grow { flex: 1 1 0; min-width: 0; }

@@ -1,0 +1,61 @@
+# Self-contained Clippify SaaS stack. API published on :8011.
+# Redis and Postgres are INTERNAL ONLY (no host port published).
+name: clippify-saas
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-clippify}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-clippify}
+      POSTGRES_DB: ${POSTGRES_DB:-clippify}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clippify} -d ${POSTGRES_DB:-clippify}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [clippify]
+
+  redis:
+    image: redis:7-alpine
+    # Internal broker/SSE only — reachable in-network as redis://redis:6379.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [clippify]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      # Compose overrides the frozen Windows ffmpeg paths with container paths.
+      FFMPEG_BIN: /usr/bin/ffmpeg
+      FFPROBE_BIN: /usr/bin/ffprobe
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-clippify}:${POSTGRES_PASSWORD:-clippify}@db:5432/${POSTGRES_DB:-clippify}
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "8011:8011"
+    volumes:
+      - ./data:/app/data
+      - modelcache:/app/models
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [clippify]
+
+volumes:
+  pgdata:
+  modelcache:
+
+networks:
+  clippify:
+    driver: bridge
