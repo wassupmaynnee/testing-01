@@ -1,7 +1,7 @@
 # --- Web framework ---
 # FROZEN PIN: >=0.138 silently drops include_router() sub-routes. Do not bump.
 fastapi>=0.115,<0.116
-uvicorn[standard]>=0.30,<0.31
+uvicorn[standard]>=0.49.0,<0.50
 python-multipart>=0.0.9
 pydantic-settings>=2.4,<3
 
