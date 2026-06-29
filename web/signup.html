@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Create your Clippify account</title>
+  <meta name="description" content="Create a free Clippify account and get 30 credits to turn long video into vertical, captioned clips." />
+  <meta name="robots" content="noindex" />
+  <link rel="canonical" href="https://clippify.app/signup" />
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800;900&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/tokens.css" />
+  <style>
+    .auth-wrap { max-width: 440px; margin: 7vh auto; }
+    .brand { font-family: var(--font-display); font-weight: 900; font-size: 24px; letter-spacing:-.03em; text-align:center; margin-bottom: 22px; }
+    .brand b { color: var(--color-accent); }
+    .panel { padding: 30px; }
+    .sub { margin-top: -4px; }
+    .alt { text-align:center; margin-top: 18px; font-size: 14px; }
+    .err-msg { color: var(--color-error); font-size: 13px; margin: 4px 0 12px; min-height: 1em; }
+    .perk { display:flex; align-items:center; gap:8px; font-size:13px; color: var(--color-text-dim); margin-top:14px; }
+    .perk b { color: var(--color-accent); }
+  </style>
+</head>
+<body>
+  <div class="auth-wrap">
+    <a class="brand" href="/" style="display:block">Clip<b>pify</b></a>
+    <div class="glass panel">
+      <h2 style="margin-top:0">Create your account</h2>
+      <p class="muted sub" id="lede">Start free — <b style="color:var(--color-accent)">30 credits</b> on signup, no card required.</p>
+
+      <form id="signup-form" novalidate>
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required placeholder="you@studio.com" />
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="new-password" required minlength="8" placeholder="At least 8 characters" />
+        </div>
+        <div class="err-msg" id="error" role="alert"></div>
+        <button class="btn btn-accent" id="submit" type="submit" style="width:100%">Create account &amp; start free</button>
+      </form>
+
+      <div class="perk">✓ <span>MP4 in, captioned 9:16 MP4 out — <b>no GPU required</b></span></div>
+      <p class="alt muted">Already have an account? <a href="/dashboard">Sign in</a></p>
+    </div>
+  </div>
+
+  <script>
+    // Continue-to-checkout support: /signup?tier=pro lands the new user straight
+    // into Stripe Checkout for that tier once the account is created.
+    const params = new URLSearchParams(location.search);
+    const nextTier = params.get("tier");
+    if (nextTier) {
+      document.getElementById("lede").innerHTML =
+        'Create your account to continue to <b style="color:var(--color-accent)">' +
+        nextTier.charAt(0).toUpperCase() + nextTier.slice(1) + '</b> checkout.';
+    }
+
+    const form = document.getElementById("signup-form");
+    const errEl = document.getElementById("error");
+    const btn = document.getElementById("submit");
+
+    async function postForm(path, fields) {
+      const body = new FormData();
+      Object.entries(fields).forEach(([k, v]) => body.append(k, v));
+      const res = await fetch(path, { method: "POST", body, credentials: "same-origin" });
+      const env = await res.json().catch(() => ({ ok: false, error: { message: "Network error" } }));
+      if (!env.ok) throw env.error || { message: "Request failed" };
+      return env.data;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errEl.textContent = "";
+      btn.disabled = true;
+      const original = btn.textContent;
+      btn.textContent = "Creating account…";
+      try {
+        await postForm("/api/auth/signup", {
+          email: document.getElementById("email").value.trim(),
+          password: document.getElementById("password").value,
+        });
+        // Logged in via the mf_session cookie now. Continue to checkout if asked.
+        if (nextTier && nextTier !== "free") {
+          try {
+            const { url } = await postForm("/api/billing/checkout", { tier: nextTier });
+            if (url) { location.href = url; return; }
+          } catch (_) { /* billing disabled / error -> just go to the app */ }
+        }
+        location.href = "/dashboard";
+      } catch (err) {
+        errEl.textContent = err.message || "Could not create account.";
+        btn.disabled = false;
+        btn.textContent = original;
+      }
+    });
+  </script>
+</body>
+</html>
