@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Python backend deps. The frozen FastAPI pin (>=0.115,<0.116) is protected:
+  # Dependabot may patch within 0.115.x but never bump the minor/major, which
+  # would silently drop include_router() sub-routes and fail CI.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "python"]
+    ignore:
+      - dependency-name: "fastapi"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
+
+  # Marketing site (Vite/React/Tailwind).
+  - package-ecosystem: "npm"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels: ["dependencies", "javascript"]
+
+  # GitHub Actions versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "ci"]
+
+  # Base image (python:3.14-slim).
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]

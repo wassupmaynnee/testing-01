@@ -29,6 +29,9 @@ node_modules/
 site/dist/
 npm-debug.log*
 *.tsbuildinfo
+# tsc -b emits next to the config when it builds project references
+site/vite.config.js
+site/vite.config.d.ts
 
 # OS / editor
 .DS_Store

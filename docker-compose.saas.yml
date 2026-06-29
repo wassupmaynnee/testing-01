@@ -30,6 +30,9 @@ services:
     networks: [clippify]
 
   api:
+    # Local `up --build` builds and tags this name; a deploy host sets
+    # CLIPPIFY_IMAGE=ghcr.io/<owner>/<repo>:latest so `compose pull` works.
+    image: ${CLIPPIFY_IMAGE:-clippify-saas-api:latest}
     build:
       context: .
       dockerfile: Dockerfile
@@ -50,6 +53,13 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    # The deploy host gates traffic on this liveness check.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8011/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks: [clippify]
 
 volumes:

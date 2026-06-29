@@ -41,9 +41,11 @@ jobs:
           python - <<'PY'
           from saas.main import app
           prefixes = {getattr(r, "path", "") for r in app.routes}
-          required = ["/api/auth/login", "/api/jobs", "/api/clips/{clip_id}",
-                      "/api/stream/{job_id}", "/api/billing/tiers", "/api/publish/{clip_id}",
-                      "/health"]
+          required = ["/api/auth/login", "/api/auth/signup", "/api/jobs",
+                      "/api/clips/{clip_id}", "/api/stream/{job_id}",
+                      "/api/billing/tiers", "/api/billing/checkout",
+                      "/api/billing/webhook", "/api/billing/portal",
+                      "/api/publish/{clip_id}", "/health"]
           have = {r.path for r in app.routes}
           missing = [p for p in required if p not in have]
           assert not missing, f"vanished routes: {missing}"

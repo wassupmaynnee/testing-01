@@ -25,4 +25,8 @@ EXPOSE 8011
 ENV FFMPEG_BIN=/usr/bin/ffmpeg \
     FFPROBE_BIN=/usr/bin/ffprobe
 
+# Liveness for deploy hosts / `docker run` (compose declares its own too).
+HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=10 \
+  CMD curl -fsS http://localhost:8011/health || exit 1
+
 ENTRYPOINT ["./entrypoint.sh"]
