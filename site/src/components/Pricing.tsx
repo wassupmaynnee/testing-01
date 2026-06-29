@@ -1,4 +1,5 @@
-import { TIERS } from '../data/content'
+import { TIERS, APP_LINKS } from '../data/content'
+import { startCheckout } from '../lib/checkout'
 import GlassCard from './ui/GlassCard'
 import Button from './ui/Button'
 import Chip from './ui/Chip'
@@ -51,7 +52,15 @@ export default function Pricing() {
 
               <Button
                 variant={tier.featured ? 'accent' : 'ghost'}
-                href="#"
+                href={
+                  tier.tierKey === 'free'
+                    ? APP_LINKS.signup
+                    : `${APP_LINKS.signup}?tier=${tier.tierKey}`
+                }
+                onClick={(e) => {
+                  e.preventDefault()
+                  void startCheckout(tier.tierKey)
+                }}
                 className="w-full"
               >
                 {tier.cta}

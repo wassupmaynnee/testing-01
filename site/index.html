@@ -3,11 +3,57 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0A0A0A" />
+
+    <title>Clippify — Turn long video into scroll-stopping vertical clips</title>
     <meta
       name="description"
-      content="Clippify turns long video into scroll-stopping vertical clips — transcribed, scored, reframed 9:16, and captioned automatically."
+      content="Clippify turns long video into scroll-stopping vertical clips — transcribed, scored, reframed 9:16, and captioned automatically. 30 free credits, no GPU required."
     />
-    <title>Clippify — Turn long video into scroll-stopping vertical clips</title>
+    <link rel="canonical" href="https://clippify.app/" />
+    <meta name="robots" content="index, follow" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Clippify" />
+    <meta property="og:title" content="Clippify — Turn long video into scroll-stopping vertical clips" />
+    <meta
+      property="og:description"
+      content="Upload an MP4; Clippify transcribes, scores, cuts, reframes 9:16 onto the speaker, and burns in captions. 30 free credits, no GPU required."
+    />
+    <meta property="og:url" content="https://clippify.app/" />
+    <meta property="og:image" content="https://clippify.app/og-image.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Clippify — AI vertical clips from long video" />
+    <meta
+      name="twitter:description"
+      content="Transcribe, score, cut, reframe 9:16, and caption — automatically. 30 free credits, no GPU required."
+    />
+    <meta name="twitter:image" content="https://clippify.app/og-image.png" />
+
+    <!-- Structured data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Clippify",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Web",
+        "description": "AI tool that turns long video into vertical, captioned clips.",
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "description": "Free tier: 30 credits on signup."
+        }
+      }
+    </script>
 
     <!-- Google Fonts: Archivo (display) + Inter (body) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,6 +62,10 @@
       href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <!-- Runtime public config (Sentry DSN / Plausible domain, env-driven) + loader -->
+    <script src="/config.js"></script>
+    <script src="/static/runtime.js" defer></script>
   </head>
   <body>
     <div id="root"></div>

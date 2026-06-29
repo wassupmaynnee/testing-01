@@ -17,6 +17,23 @@
   --color-text-dim:       #a9a9b2;
   --color-text-faint:     #6c6c78;
 
+  /* --- RGB triplets of the SAME palette (single source of truth) ---
+     These let tailwind.config.js consume the identical values via
+     rgb(var(--rgb-*) / <alpha-value>) so opacity modifiers (bg-accent/10,
+     border-accent/40, …) keep working in the React marketing site. Edit a
+     colour here once and both the dashboard and the landing page follow. */
+  --rgb-surface:          10 10 10;
+  --rgb-surface-2:        17 17 20;
+  --rgb-surface-3:        23 23 28;
+  --rgb-accent:           255 122 0;
+  --rgb-accent-hot:       255 146 51;
+  --rgb-accent-deep:      201 95 0;
+  --rgb-text:             245 245 247;
+  --rgb-text-dim:         169 169 178;
+  --rgb-text-faint:       108 108 120;
+  --rgb-success:          46 204 113;
+  --rgb-error:            255 77 77;
+
   /* --- Glass --- */
   --glass-bg:             rgba(255, 255, 255, 0.045);
   --glass-bg-strong:      rgba(255, 255, 255, 0.07);

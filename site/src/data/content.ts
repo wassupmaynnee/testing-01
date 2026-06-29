@@ -18,8 +18,17 @@ export interface Tier {
   credits: string
   note: string
   cta: string
+  tierKey: 'free' | 'starter' | 'pro' | 'scale'
   featured?: boolean
 }
+
+// Live app destinations — the marketing page is the public front door; these
+// links cross into the unified single-origin app. No dead CTAs anywhere.
+export const APP_LINKS = {
+  signup: '/signup',
+  signin: '/dashboard',
+  dashboard: '/dashboard',
+} as const
 
 export interface Faq {
   question: string
@@ -107,6 +116,7 @@ export const TIERS: Tier[] = [
     credits: '30 credits',
     note: 'one-time trial on signup',
     cta: 'Start free',
+    tierKey: 'free',
   },
   {
     name: 'Starter',
@@ -115,6 +125,7 @@ export const TIERS: Tier[] = [
     credits: '200 credits',
     note: 'billed annually',
     cta: 'Choose Starter',
+    tierKey: 'starter',
   },
   {
     name: 'Pro',
@@ -123,6 +134,7 @@ export const TIERS: Tier[] = [
     credits: '500 credits',
     note: 'billed annually',
     cta: 'Choose Pro',
+    tierKey: 'pro',
     featured: true,
   },
   {
@@ -132,6 +144,7 @@ export const TIERS: Tier[] = [
     credits: '1,200 credits',
     note: 'billed annually',
     cta: 'Choose Scale',
+    tierKey: 'scale',
   },
 ]
 

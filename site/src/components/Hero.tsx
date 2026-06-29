@@ -1,5 +1,6 @@
 import Button from './ui/Button'
 import Chip from './ui/Chip'
+import { APP_LINKS } from '../data/content'
 
 /** Pure CSS/SVG mock of a 9:16 vertical clip — no real media. */
 function ClipMock() {
@@ -97,7 +98,7 @@ export default function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button variant="accent" href="#" className="px-6 py-3.5 text-base">
+            <Button variant="accent" href={APP_LINKS.signup} className="px-6 py-3.5 text-base">
               Start clipping free
             </Button>
             <Button variant="ghost" href="#pricing" className="px-6 py-3.5 text-base">

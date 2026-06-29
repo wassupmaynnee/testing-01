@@ -4,26 +4,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Surfaces
+        // SINGLE SOURCE OF TRUTH: these consume the rgb-triplet CSS variables
+        // defined in web/tokens.css (the canonical dashboard palette), imported
+        // into the React app via src/main.tsx. rgb(var(--x) / <alpha-value>)
+        // keeps Tailwind opacity modifiers (bg-accent/10, border-accent/40, …)
+        // working while the dashboard and landing page share one palette.
         surface: {
-          DEFAULT: '#0A0A0A',
-          2: '#111114',
-          3: '#17171c',
+          DEFAULT: 'rgb(var(--rgb-surface) / <alpha-value>)',
+          2: 'rgb(var(--rgb-surface-2) / <alpha-value>)',
+          3: 'rgb(var(--rgb-surface-3) / <alpha-value>)',
         },
-        // Accent neon orange
         accent: {
-          DEFAULT: '#FF7A00',
-          hot: '#ff9233',
-          deep: '#c95f00',
+          DEFAULT: 'rgb(var(--rgb-accent) / <alpha-value>)',
+          hot: 'rgb(var(--rgb-accent-hot) / <alpha-value>)',
+          deep: 'rgb(var(--rgb-accent-deep) / <alpha-value>)',
         },
-        // Text
         text: {
-          DEFAULT: '#f5f5f7',
-          dim: '#a9a9b2',
-          faint: '#6c6c78',
+          DEFAULT: 'rgb(var(--rgb-text) / <alpha-value>)',
+          dim: 'rgb(var(--rgb-text-dim) / <alpha-value>)',
+          faint: 'rgb(var(--rgb-text-faint) / <alpha-value>)',
         },
-        success: '#2ecc71',
-        error: '#ff4d4d',
+        success: 'rgb(var(--rgb-success) / <alpha-value>)',
+        error: 'rgb(var(--rgb-error) / <alpha-value>)',
       },
       fontFamily: {
         display: ['Archivo', 'system-ui', 'sans-serif'],

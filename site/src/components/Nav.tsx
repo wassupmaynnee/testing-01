@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { NAV_LINKS } from '../data/content'
+import { NAV_LINKS, APP_LINKS } from '../data/content'
 import Button from './ui/Button'
 import Wordmark from './ui/Wordmark'
 
@@ -33,11 +33,11 @@ export default function Nav() {
 
           {/* Desktop actions */}
           <div className="hidden items-center gap-3 md:flex">
-            <Button variant="ghost" href="#" className="px-4 py-2">
+            <Button variant="ghost" href={APP_LINKS.signin} className="px-4 py-2">
               Sign in
             </Button>
-            <Button variant="accent" href="#" className="px-4 py-2">
-              Open app
+            <Button variant="accent" href={APP_LINKS.signup} className="px-4 py-2">
+              Start free
             </Button>
           </div>
 
@@ -86,11 +86,11 @@ export default function Nav() {
                 </li>
               ))}
               <li className="mt-2 flex flex-col gap-3">
-                <Button variant="ghost" href="#" onClick={() => setOpen(false)}>
+                <Button variant="ghost" href={APP_LINKS.signin} onClick={() => setOpen(false)}>
                   Sign in
                 </Button>
-                <Button variant="accent" href="#" onClick={() => setOpen(false)}>
-                  Open app
+                <Button variant="accent" href={APP_LINKS.signup} onClick={() => setOpen(false)}>
+                  Start free
                 </Button>
               </li>
             </ul>
