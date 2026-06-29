@@ -41,6 +41,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     credits: Mapped[int] = mapped_column(Integer, default=0)
+    # Current plan key from the frozen tier catalog (free|starter|pro|scale).
+    tier: Mapped[str] = mapped_column(String(32), default="free")
+    # Stripe customer handle — set on first checkout so the billing portal and
+    # repeat purchases reuse one customer. Nullable until they buy.
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all,delete-orphan")
@@ -95,3 +100,18 @@ class CreditLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     user: Mapped[User] = relationship(back_populates="ledger")
+
+
+class StripeEvent(Base):
+    """
+    Idempotency ledger for Stripe webhooks. The Stripe event id is the primary
+    key, so a duplicate `checkout.session.completed` (Stripe does not guarantee
+    single delivery) is a no-op insert conflict and credits never double-grant.
+    """
+    __tablename__ = "stripe_events"
+
+    id: Mapped[str] = mapped_column(String(255), primary_key=True)  # Stripe event id (evt_...)
+    type: Mapped[str] = mapped_column(String(128))
+    user_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    credits_granted: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

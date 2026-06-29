@@ -13,6 +13,15 @@ psycopg[binary]>=3.2,<4
 # --- Broker / SSE transport ---
 redis>=5.0,<6
 
+# --- Billing (Stripe). SDK is lazy-loaded only when STRIPE_SECRET_KEY is set
+# (frozen contract); webhook signatures are verified by our own HMAC-SHA256,
+# not the SDK. Pinned here so the lazy import resolves once billing is enabled. ---
+stripe>=11,<13
+
+# --- Error & performance monitoring. Initialized only when SENTRY_DSN is set;
+# an absent DSN is a no-op, so the app boots identically without it. ---
+sentry-sdk[fastapi]>=2.0,<3
+
 # --- Pipeline / render ---
 faster-whisper>=1.0,<2
 opencv-python-headless>=4.9,<5
