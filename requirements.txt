@@ -11,7 +11,7 @@ alembic>=1.13,<2
 psycopg[binary]>=3.2,<4
 
 # --- Broker / SSE transport ---
-redis>=5.0,<6
+redis>=8.0.1,<9
 
 # --- Billing (Stripe). SDK is lazy-loaded only when STRIPE_SECRET_KEY is set
 # (frozen contract); webhook signatures are verified by our own HMAC-SHA256,
