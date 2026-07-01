@@ -28,6 +28,7 @@ const AppState = {
   progress: 0,       // 0..1
   clip: null,        // {id,title,score,signals,fileUrl,downloadUrl}
   sse: null,         // EventSource handle
+  publish: { enabled: false, accounts: [] }, // OAuth publish destinations
 };
 
 // --- envelope-aware fetch ---
@@ -106,12 +107,39 @@ function renderClip() {
     <div><b>${(s.face ?? 0).toFixed(2)}</b>face</div>`;
 }
 
+function renderPublish() {
+  const status = $("publish-status");
+  const connectBtn = $("connect-yt-btn");
+  if (!status || !connectBtn) return;
+  const accounts = AppState.publish.accounts || [];
+  const yt = accounts.find((a) => a.provider === "youtube");
+  if (!AppState.publish.enabled) {
+    status.textContent = "Publishing: not configured";
+    connectBtn.classList.add("hidden");
+  } else if (yt) {
+    status.textContent = `Publishing: connected${yt.accountLabel ? " · " + yt.accountLabel : ""}`;
+    connectBtn.classList.add("hidden");
+  } else {
+    status.textContent = "Publishing: not connected";
+    connectBtn.classList.remove("hidden");
+  }
+}
+
 // --- data loaders ---
 async function loadMe() {
   try { AppState.user = await api("/api/auth/me"); }
   catch { AppState.user = null; }
   renderUser();
-  if (AppState.user) await refreshJobs();
+  if (AppState.user) { await refreshJobs(); await loadPublish(); }
+}
+
+async function loadPublish() {
+  try {
+    const data = await api("/api/publish/providers");
+    const yt = (data.providers || []).find((p) => p.key === "youtube");
+    AppState.publish = { enabled: !!(yt && yt.enabled), accounts: data.accounts || [] };
+  } catch { AppState.publish = { enabled: false, accounts: [] }; }
+  renderPublish();
 }
 
 async function refreshJobs() {
@@ -216,6 +244,31 @@ const actions = {
     }
   },
 
+  async "connect-youtube"() {
+    try {
+      const data = await api("/api/publish/youtube/connect");
+      if (data && data.url) { window.location.href = data.url; }
+    } catch (e) {
+      toast(e.code === "deferred" ? "Publishing isn't enabled yet." : e.message, "err");
+    }
+  },
+
+  async "publish-clip"() {
+    if (!AppState.clip) { toast("Generate a clip first", "err"); return; }
+    const btn = $("publish-btn");
+    if (btn) btn.disabled = true;
+    try {
+      const data = await api(`/api/publish/${AppState.clip.id}`, { method: "POST" });
+      toast(`Published privately to YouTube${data.url ? " · " + data.url : ""}`, "ok");
+    } catch (e) {
+      if (e.code === "deferred") toast("Publishing isn't enabled yet.", "err");
+      else if (e.code === "not_connected") { toast("Connect a YouTube account first.", "err"); await loadPublish(); }
+      else toast(e.message, "err");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  },
+
   download() { /* href on the anchor handles the actual download */ },
 };
 
@@ -238,6 +291,17 @@ document.addEventListener("change", (e) => {
   $("upload-btn").disabled = !AppState.file;
 });
 
+// OAuth connect round-trip feedback (?connect=youtube&ok=1 | &error=...)
+function showConnectFeedback() {
+  const q = new URLSearchParams(window.location.search);
+  if (q.get("connect") !== "youtube") return;
+  if (q.get("ok")) toast("YouTube connected — clips publish privately.", "ok");
+  else if (q.get("error")) toast(`Couldn't connect YouTube (${q.get("error")}).`, "err");
+  // Strip the params so a refresh doesn't re-toast.
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
 // boot
 renderStepper();
+showConnectFeedback();
 loadMe();
