@@ -98,6 +98,19 @@
                 <a class="btn btn-accent" id="download-link" data-action="download" download>Download</a>
               </div>
               <div class="signals" id="clip-signals"></div>
+
+              <div class="publish" style="margin-top:14px; border-top:1px solid var(--glass-border); padding-top:14px">
+                <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
+                  <span class="faint" id="publish-status">Publishing: not connected</span>
+                  <div class="row" style="gap:8px">
+                    <button class="btn hidden" data-action="connect-youtube" id="connect-yt-btn">Connect YouTube</button>
+                    <button class="btn btn-accent" data-action="publish-clip" id="publish-btn">Publish (private)</button>
+                  </div>
+                </div>
+                <div class="faint" style="font-size:12px; margin-top:6px">
+                  Uploads go to <b>your</b> channel as <b>private</b> — nothing is ever posted publicly or automatically.
+                </div>
+              </div>
             </div>
           </div>
 

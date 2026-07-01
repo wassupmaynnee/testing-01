@@ -97,14 +97,36 @@ stub code). No `TODO`/`FIXME`/`implement later` anywhere in the live path.
 `.env` is gitignored (`git check-ignore .env` → `.env`); only `.env.example` (example
 values) is tracked. No `sk_`/`whsec_` real keys in the repo.
 
+### 10. OAuth publishing (private-default) + test suite  ✅ (this pass — executed)
+The previously-deferred publishing seam is now **fully implemented**, and a `pytest`
+suite was added. Verified in the clean venv:
+- New backend: `saas/crypto.py` (Fernet token encryption, key derived from `APP_SECRET`,
+  `cryptography` lazy-loaded), `saas/publish_core.py` (YouTube OAuth 2.0 flow, channel-label
+  fetch, encrypted-token upsert, auto-refresh, **`video_insert_body()` hard-codes
+  `privacyStatus="private"`** — there is no public/unlisted code path), a real
+  `saas/routers/publish.py` (`/providers`, `/youtube/connect`, `/youtube/callback`,
+  `/youtube/disconnect`, `POST /{clip_id}`), the `OAuthAccount` model, and migration
+  `0003_oauth_accounts` (additive, introspective, linear after `0002_billing`).
+- Frozen guardrails honored: **OAuth 2.0 only** (no browser automation), uploads **always
+  private**, **nothing auto-publishes** (upload happens only on an explicit `POST` from a
+  deliberate dashboard click), tokens **encrypted at rest**, Google libs **lazy-loaded only
+  when `YOUTUBE_OAUTH_CLIENT_ID/_SECRET` are set** (the app boots and degrades to a clean
+  `501 deferred` without them).
+- Dashboard: a Publish panel (Connect YouTube + "Publish (private)") wired into the existing
+  single delegated `[data-action]` switch and the `{ok,data|error}` `api()` helper.
+- **`pytest -q` → 25 passed** in the clean venv. `tests/test_contracts.py` (frozen weights
+  0.35/0.20/0.25/0.20, the 7 SSE `STEP_LABELS`, the envelope), `tests/test_billing.py`
+  (raw-body HMAC verify, idempotent ledger-keyed grants), `tests/test_publish.py`
+  (private-default body, token encrypt/decrypt roundtrip, CSRF `state`, graceful `deferred`).
+- `ruff check saas` → **All checks passed!** Sub-router survival now also asserts
+  `/api/publish/providers` and `/api/publish/youtube/connect`. CI gained a `pytest` step.
+
 ## Deferred seams left in place (out of scope, by design)
 - **URL ingest** (`YouTubeSource`/`TwitchSource`) and **long-video map-reduce** — unchanged
   typed interfaces returning a clean `deferred`.
-- **OAuth publishing** (`POST /api/publish/{clip_id}`) — left as the clean `deferred` seam.
-  Reason: out of scope this pass; when built it must be OAuth-2.0-only with forced
-  `private`/`SELF_ONLY` (no browser automation), per the guardrails.
 
-Signup and Stripe billing were deferred seams and are now **fully implemented**.
+Signup, Stripe billing, and OAuth publishing were deferred seams and are now **fully
+implemented**.
 
 ## How to reproduce the local verification (no Docker, no Stripe keys)
 A clean venv runs the real auth + billing routers against SQLite and forges a signed Stripe
@@ -120,6 +142,14 @@ python -m venv venv && venv/Scripts/python -m pip install \
 ```
 The exact harness used is `verify_app.py` (signs with `STRIPE_WEBHOOK_SECRET`); 21/21
 assertions passed.
+
+Run the unit suite (no Docker, no Stripe/Google keys needed):
+```bash
+python -m venv venv
+venv/Scripts/python -m pip install -r requirements-dev.txt   # or the subset above + pytest
+DATABASE_URL="sqlite:///./test.db" APP_SECRET=test venv/Scripts/python -m pytest -q
+# -> 25 passed  (contracts + billing + publishing)
+```
 
 ## Open the PR (gh not installed here)
 ```bash

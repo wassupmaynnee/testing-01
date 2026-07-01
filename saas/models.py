@@ -1,4 +1,4 @@
-"""ORM models: users, jobs, clips, and a credit ledger."""
+"""ORM models: users, jobs, clips, a credit ledger, and OAuth publish accounts."""
 from __future__ import annotations
 
 import enum
@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    DateTime, Enum, Float, ForeignKey, Integer, String, Text,
+    DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,6 +50,9 @@ class User(Base):
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all,delete-orphan")
     ledger: Mapped[list["CreditLedger"]] = relationship(back_populates="user", cascade="all,delete-orphan")
+    oauth_accounts: Mapped[list["OAuthAccount"]] = relationship(
+        back_populates="user", cascade="all,delete-orphan"
+    )
 
 
 class Job(Base):
@@ -115,3 +118,27 @@ class StripeEvent(Base):
     user_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     credits_granted: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class OAuthAccount(Base):
+    """A user's connected publishing destination (OAuth 2.0 only).
+
+    Tokens are stored ENCRYPTED at rest (see saas/crypto.py). One row per
+    (user, provider). Used only to upload the user's own clips to their own
+    channel, always at private visibility.
+    """
+    __tablename__ = "oauth_accounts"
+    __table_args__ = (UniqueConstraint("user_id", "provider", name="uq_oauth_user_provider"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    provider: Mapped[str] = mapped_column(String(32), index=True)  # e.g. "youtube"
+    access_token_enc: Mapped[str] = mapped_column(Text)
+    refresh_token_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    token_expiry: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scope: Mapped[str | None] = mapped_column(Text, nullable=True)
+    account_label: Mapped[str | None] = mapped_column(String(255), nullable=True)  # channel title
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+    user: Mapped[User] = relationship(back_populates="oauth_accounts")

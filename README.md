@@ -163,9 +163,43 @@ image with `CLIPPIFY_IMAGE=ghcr.io/<owner>/<repo>:latest`.
 |---|---|---|
 | YouTube / Twitch URL ingest | `YouTubeSource` / `TwitchSource` (`saas/pipeline/base.py`) | `saas/pipeline/ingest_url.py` |
 | Long-video map-reduce | `MapReduceStrategy` (`saas/pipeline/base.py`) | `saas/pipeline/mapreduce.py` |
-| OAuth publishing (OAuth 2.0 only, forced `private`/`SELF_ONLY`) | `POST /api/publish/{clip_id}` | `saas/publish_core.py` |
 
-Signup and Stripe billing — previously deferred — are **implemented** in this repo.
+Signup, Stripe billing, and OAuth publishing — previously deferred — are **implemented**
+in this repo.
+
+## Publishing (OAuth 2.0 → YouTube, private only)
+
+Connect a YouTube account on the dashboard and publish a finished clip with one explicit
+click. Hard guarantees, enforced in code:
+
+- **OAuth 2.0 only** — no password/browser-automation upload path.
+- **Always private** — `saas/publish_core.py:video_insert_body()` hard-codes
+  `privacyStatus="private"`; visibility is not a caller parameter.
+- **Never automatic** — a clip uploads only in response to `POST /api/publish/{clip_id}`
+  from a deliberate user action; the pipeline never publishes.
+- **Tokens encrypted at rest** — Fernet, key derived from `APP_SECRET` (`saas/crypto.py`).
+- **Env-gated + lazy** — Google client libs load only when `YOUTUBE_OAUTH_CLIENT_ID` /
+  `YOUTUBE_OAUTH_CLIENT_SECRET` are set; otherwise Connect/Publish return a clean
+  `501 deferred` and the app boots normally.
+
+Enable it: create a Google Cloud OAuth 2.0 *Web application* client with the YouTube Data
+API v3 enabled, add `…/api/publish/youtube/callback` as an authorized redirect URI, and set
+the three `YOUTUBE_OAUTH_*` vars in `.env`.
+
+| Route | Purpose |
+|---|---|
+| `GET /api/publish/providers` | Destinations + this user's connected accounts |
+| `GET /api/publish/youtube/connect` | Returns the Google consent URL to redirect to |
+| `GET /api/publish/youtube/callback` | OAuth redirect target → stores encrypted tokens |
+| `POST /api/publish/youtube/disconnect` | Remove the connection |
+| `POST /api/publish/{clip_id}` | Publish one owned clip — **private**, explicit action |
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest -q     # 25 passed — contracts (frozen weights/SSE labels/envelope), billing, publishing
+```
 
 ## License
 

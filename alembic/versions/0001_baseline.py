@@ -12,15 +12,16 @@ down_revision = None
 branch_labels = None
 depends_on = None
 
+# Native PG enum types. With generic sa.Enum, op.create_table() emits CREATE TYPE on
+# first use (the jobs table below is the sole user of each), so we must NOT also create
+# them explicitly — a second, unguarded CREATE TYPE fails on a fresh DB with
+# "type already exists". (create_type is a postgresql.ENUM-only flag and is silently
+# ignored by generic sa.Enum, so it cannot suppress the table-level CREATE TYPE.)
 job_status = sa.Enum("queued", "running", "completed", "failed", name="jobstatus")
 ingest_kind = sa.Enum("upload", "youtube", "twitch", name="ingestkind")
 
 
 def upgrade() -> None:
-    bind = op.get_bind()
-    job_status.create(bind, checkfirst=True)
-    ingest_kind.create(bind, checkfirst=True)
-
     op.create_table(
         "users",
         sa.Column("id", sa.String(32), primary_key=True),

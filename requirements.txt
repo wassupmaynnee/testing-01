@@ -26,3 +26,12 @@ sentry-sdk[fastapi]>=2.0,<3
 faster-whisper>=1.0,<2
 opencv-python-headless>=4.9,<5
 numpy>=1.26,<3
+
+# --- OAuth publishing (YouTube). OAuth 2.0 only; uploads forced PRIVATE. The
+# Google client libs + cryptography are imported lazily and only on the
+# env-gated publishing path, so the app boots identically without credentials.
+# Pinned here so the lazy import resolves once publishing is enabled. ---
+cryptography>=42,<46
+google-auth>=2.30,<3
+google-auth-oauthlib>=1.2,<2
+google-api-python-client>=2.130,<3

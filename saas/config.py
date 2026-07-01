@@ -59,9 +59,12 @@ class Settings(BaseSettings):
     # --- Privacy-friendly analytics (Plausible). Blank = no script injected. ---
     plausible_domain: str = ""
 
-    # --- OAuth publishing (deferred seam) ---
+    # --- OAuth publishing (YouTube). OAuth 2.0 ONLY; uploads are FORCED private.
+    # The Google client libs are lazy-loaded only when a client id is configured
+    # (see saas/publish_core.py), so the app boots fine with these blank. ---
     youtube_oauth_client_id: str = ""
     youtube_oauth_client_secret: str = ""
+    youtube_oauth_redirect_uri: str = "http://localhost:8011/api/publish/youtube/callback"
 
     @property
     def success_url(self) -> str:
