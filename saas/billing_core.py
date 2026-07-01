@@ -47,8 +47,55 @@ TIERS: list[Tier] = [
 _TIERS_BY_KEY = {t.key: t for t in TIERS}
 
 
+# --------------------------------------------------------------------------- #
+# Pricing — SINGLE source of truth for BOTH billing intervals.                 #
+#                                                                              #
+# Tier.price_usd (above) is the monthly catalog amount and is FROZEN. Every    #
+# interval amount is derived from it here so nothing is scattered:             #
+#   * monthly = price_usd                          (catalog's monthly figure)  #
+#   * annual  = price_usd * ANNUAL_MONTHS_BILLED   (existing annual, unchanged) #
+# The existing annual behaviour (12x, no discount) is preserved exactly; only  #
+# the monthly interval is added. To re-price, edit ONLY this file.             #
+# --------------------------------------------------------------------------- #
+VALID_INTERVALS = ("monthly", "annual")
+DEFAULT_INTERVAL = "annual"
+ANNUAL_MONTHS_BILLED = 12  # annual total = 12 x monthly (frozen: no discount)
+
+
+def normalize_interval(interval: str | None) -> str:
+    return interval if interval in VALID_INTERVALS else DEFAULT_INTERVAL
+
+
+def interval_amount_cents(tier: Tier, interval: str) -> int:
+    """Charge amount in cents for a tier on the given interval."""
+    months = 1 if interval == "monthly" else ANNUAL_MONTHS_BILLED
+    return round(tier.price_usd * months * 100)
+
+
+def _stripe_interval(interval: str) -> str:
+    return "month" if interval == "monthly" else "year"
+
+
+def pricing_table() -> list[dict]:
+    """Full monthly + annual price table for every tier — what the pricing UI
+    renders and the Monthly/Annual toggle switches between."""
+    return [
+        {
+            "key": t.key,
+            "name": t.name,
+            "monthly_credits": t.monthly_credits,
+            "price_usd": round(t.price_usd, 2),                     # monthly (kept for back-compat)
+            "monthly_usd": round(t.price_usd, 2),
+            "annual_usd": round(t.price_usd * ANNUAL_MONTHS_BILLED, 2),
+            "billing": t.billing,
+        }
+        for t in TIERS
+    ]
+
+
 def tier_catalog() -> list[dict]:
-    return [t.__dict__ for t in TIERS]
+    # Enriched with both interval prices so the toggle needs no second call.
+    return pricing_table()
 
 
 def tier_by_key(key: str) -> Tier | None:
@@ -93,8 +140,14 @@ def verify_webhook_signature(payload: bytes, sig_header: str, tolerance: int = 3
 # --------------------------------------------------------------------------- #
 # Checkout + Portal                                                           #
 # --------------------------------------------------------------------------- #
-def _price_id_for(tier: Tier) -> str:
+def _price_id_for(tier: Tier, interval: str) -> str:
     s = get_settings()
+    if interval == "monthly":
+        return {
+            "starter": s.stripe_price_starter_monthly,
+            "pro": s.stripe_price_pro_monthly,
+            "scale": s.stripe_price_scale_monthly,
+        }.get(tier.key, "")
     return {
         "starter": s.stripe_price_starter,
         "pro": s.stripe_price_pro,
@@ -102,24 +155,24 @@ def _price_id_for(tier: Tier) -> str:
     }.get(tier.key, "")
 
 
-def _line_item(tier: Tier) -> dict:
+def _line_item(tier: Tier, interval: str) -> dict:
     """
-    Prefer a configured Stripe Price ID; otherwise build an inline recurring
-    price from the frozen catalog so test-mode Checkout works with zero Stripe
-    dashboard setup. Displayed price is per-month, billed annually -> 12x/year.
+    Prefer a configured Stripe Price ID for the interval; otherwise build an
+    inline recurring price from the frozen catalog (pricing_table()) so test-mode
+    Checkout works with zero Stripe dashboard setup, on either interval.
     """
-    price_id = _price_id_for(tier)
+    price_id = _price_id_for(tier, interval)
     if price_id:
         return {"price": price_id, "quantity": 1}
     return {
         "quantity": 1,
         "price_data": {
             "currency": "usd",
-            "unit_amount": round(tier.price_usd * 12 * 100),  # annual total, in cents
-            "recurring": {"interval": "year"},
+            "unit_amount": interval_amount_cents(tier, interval),
+            "recurring": {"interval": _stripe_interval(interval)},
             "product_data": {
-                "name": f"Clippify {tier.name}",
-                "description": f"{tier.monthly_credits} credits / month, {tier.billing}.",
+                "name": f"Clippify {tier.name} ({interval})",
+                "description": f"{tier.monthly_credits} credits / month.",
             },
         },
     }
@@ -136,11 +189,13 @@ def _ensure_customer(stripe, db, user) -> str:
     return customer.id
 
 
-def create_checkout_session(user_id: str, tier_key: str) -> dict:
-    """Create a hosted Stripe Checkout session for a paid tier. Returns {url, sessionId}."""
+def create_checkout_session(user_id: str, tier_key: str, interval: str = DEFAULT_INTERVAL) -> dict:
+    """Create a hosted Stripe Checkout session for a paid tier on the selected
+    interval ("monthly" | "annual"). Returns {url, sessionId, tier, interval}."""
     tier = tier_by_key(tier_key)
     if tier is None or tier.key == "free":
         raise ValueError(f"'{tier_key}' is not a purchasable tier")
+    interval = normalize_interval(interval)
 
     stripe = _load_stripe()
     s = get_settings()
@@ -155,18 +210,19 @@ def create_checkout_session(user_id: str, tier_key: str) -> dict:
             raise ValueError("unknown user")
         customer_id = _ensure_customer(stripe, db, user)
 
+        meta = {"user_id": user.id, "tier_key": tier.key, "interval": interval}
         session = stripe.checkout.Session.create(
             mode="subscription",
             customer=customer_id,
             client_reference_id=user.id,
-            line_items=[_line_item(tier)],
+            line_items=[_line_item(tier, interval)],
             success_url=s.success_url,
             cancel_url=s.cancel_url,
-            metadata={"user_id": user.id, "tier_key": tier.key},
-            subscription_data={"metadata": {"user_id": user.id, "tier_key": tier.key}},
+            metadata=meta,
+            subscription_data={"metadata": meta},
             allow_promotion_codes=True,
         )
-        return {"url": session.url, "sessionId": session.id, "tier": tier.key}
+        return {"url": session.url, "sessionId": session.id, "tier": tier.key, "interval": interval}
     finally:
         db.close()
 
@@ -251,13 +307,16 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
 
         if event_type == "checkout.session.completed":
             session = (event.get("data") or {}).get("object") or {}
-            tier_key = (session.get("metadata") or {}).get("tier_key") or "starter"
+            meta = session.get("metadata") or {}
+            tier_key = meta.get("tier_key") or "starter"
+            interval = normalize_interval(meta.get("interval"))
             tier = tier_by_key(tier_key) or tier_by_key("starter")
             user = _resolve_user(db, session)
             if user is not None:
                 granted = tier.monthly_credits
                 user.credits += granted
                 user.tier = tier.key
+                user.billing_interval = interval  # record the chosen interval
                 cust = session.get("customer")
                 if cust and not user.stripe_customer_id:
                     user.stripe_customer_id = cust

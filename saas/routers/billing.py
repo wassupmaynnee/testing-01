@@ -23,13 +23,18 @@ def tiers():
 
 
 @router.post("/checkout")
-def checkout(tier: str = Form(...), user: User = Depends(current_user)):
-    """Start hosted Stripe Checkout for a paid tier. Returns {url} to redirect to."""
+def checkout(
+    tier: str = Form(...),
+    interval: str = Form("annual"),
+    user: User = Depends(current_user),
+):
+    """Start hosted Stripe Checkout for a paid tier on the selected interval
+    ("monthly" | "annual"). Returns {url} to redirect to."""
     if not stripe_enabled():
         # Graceful degrade: app still boots & pricing still renders without Stripe.
         return deferred("Stripe checkout", "set STRIPE_SECRET_KEY to enable billing")
     try:
-        return ok(create_checkout_session(user.id, tier))
+        return ok(create_checkout_session(user.id, tier, interval))
     except ValueError as exc:
         return err("bad_tier", str(exc), status_code=400)
     except Exception as exc:  # noqa: BLE001 — surface Stripe/network errors cleanly
