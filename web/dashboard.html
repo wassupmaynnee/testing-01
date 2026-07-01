@@ -69,7 +69,7 @@
               <h2 style="margin:0">New clip</h2>
               <span class="credits muted">Credits: <b id="credits">–</b></span>
             </div>
-            <p class="muted">Upload a short MP4 (≤ 10 min). One credit per clip.</p>
+            <p class="muted">Upload an MP4 or paste a YouTube URL. One credit per clip.</p>
             <div class="dropzone" data-action="choose-file">
               <div style="font-size:34px">⬆</div>
               <div><b>Click to choose an MP4</b></div>
@@ -78,6 +78,20 @@
             <input id="file-input" type="file" accept="video/mp4,video/*" class="hidden" />
             <button class="btn btn-accent" data-action="upload" id="upload-btn" disabled
               style="width:100%; margin-top:14px">Generate clip</button>
+
+            <div class="row" style="align-items:center; gap:10px; margin:16px 0 10px">
+              <span style="flex:1; height:1px; background:var(--glass-border)"></span>
+              <span class="faint" style="font-size:12px">or from a link</span>
+              <span style="flex:1; height:1px; background:var(--glass-border)"></span>
+            </div>
+            <input id="url-input" type="url" inputmode="url"
+              placeholder="https://youtube.com/watch?v=…"
+              style="width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,.03); color:var(--color-text)" />
+            <p class="faint" style="font-size:12px; margin:8px 0 0">
+              We’ll cut the <b>top <span id="clips-per-video">3</span> moments</b> into separate 9:16 clips.
+            </p>
+            <button class="btn btn-accent" data-action="submit-url" id="url-btn"
+              style="width:100%; margin-top:12px">Generate clips from URL</button>
           </div>
 
           <div class="glass panel">

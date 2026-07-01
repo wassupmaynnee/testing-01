@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import current_user
 from ..models import Clip, Job, User
 from ..responses import err, ok
+from ..storage import is_r2_ref, presigned_url
 
 router = APIRouter(prefix="/api/clips", tags=["clips"])
 
@@ -22,6 +23,18 @@ def _owned_clip(clip_id: str, user: User, db: Session) -> Clip | None:
     if not job or job.user_id != user.id:
         return None
     return clip
+
+
+def _serve(clip: Clip, *, download: bool = False):
+    """Serve a clip from R2 (presigned redirect) or the local volume."""
+    if is_r2_ref(clip.file_path):
+        return RedirectResponse(presigned_url(clip.file_path), status_code=307)
+    if not Path(clip.file_path).exists():
+        return err("not_found", "Clip file not found.", status_code=404)
+    if download:
+        return FileResponse(clip.file_path, media_type="video/mp4",
+                            filename=f"{clip.title or 'clip'}.mp4")
+    return FileResponse(clip.file_path, media_type="video/mp4")
 
 
 @router.get("/{clip_id}")
@@ -40,15 +53,14 @@ def clip_meta(clip_id: str, user: User = Depends(current_user), db: Session = De
 @router.get("/{clip_id}/file")
 def clip_file(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     clip = _owned_clip(clip_id, user, db)
-    if not clip or not Path(clip.file_path).exists():
+    if not clip:
         return err("not_found", "Clip file not found.", status_code=404)
-    return FileResponse(clip.file_path, media_type="video/mp4")
+    return _serve(clip)
 
 
 @router.get("/{clip_id}/download")
 def clip_download(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     clip = _owned_clip(clip_id, user, db)
-    if not clip or not Path(clip.file_path).exists():
+    if not clip:
         return err("not_found", "Clip file not found.", status_code=404)
-    return FileResponse(clip.file_path, media_type="video/mp4",
-                        filename=f"{clip.title or 'clip'}.mp4")
+    return _serve(clip, download=True)

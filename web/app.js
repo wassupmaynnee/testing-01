@@ -233,6 +233,30 @@ const actions = {
     }
   },
 
+  async "submit-url"() {
+    const input = $("url-input");
+    const url = (input.value || "").trim();
+    if (!url) { toast("Paste a YouTube URL first", "err"); return; }
+    const btn = $("url-btn");
+    if (btn) btn.disabled = true;
+    AppState.clip = null; renderClip();
+    AppState.stage = 0; AppState.progress = 0; renderStepper();
+    try {
+      const body = new FormData();
+      body.append("url", url);
+      const job = await api("/api/jobs", { method: "POST", body });
+      toast("URL accepted — cutting clips", "ok");
+      input.value = "";
+      connectStream(job.id);
+      await refreshJobs();
+      await loadMe();
+    } catch (e) {
+      toast(e.message, "err");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  },
+
   async "open-job"(el) { await openJob(el.dataset.job); },
 
   async "billing-portal"() {
