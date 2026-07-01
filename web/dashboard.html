@@ -134,6 +134,31 @@
           </div>
         </div>
       </div>
+
+      <!-- Feature C: channel analytics + full clip library (auth-guarded via view-app) -->
+      <div style="margin-top:var(--gap); display:flex; flex-direction:column; gap:var(--gap)">
+        <div class="glass panel">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <h3 style="margin:0">Your channel analytics</h3>
+            <div class="row" style="gap:10px; align-items:center">
+              <span class="faint" id="analytics-updated"></span>
+              <button class="btn" data-action="refresh-analytics" id="analytics-refresh">Refresh</button>
+            </div>
+          </div>
+          <div id="analytics-body" class="faint" style="margin-top:12px">Connect YouTube to see analytics for your channel.</div>
+        </div>
+
+        <div class="glass panel">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <h3 style="margin:0">My clips</h3>
+            <span class="faint" id="clips-total"></span>
+          </div>
+          <div id="clip-library" style="margin-top:12px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+            <p class="faint">Your rendered clips will appear here.</p>
+          </div>
+          <button class="btn hidden" data-action="load-more-clips" id="load-more-clips" style="margin-top:14px; width:100%">Load more</button>
+        </div>
+      </div>
     </section>
   </div>
 

@@ -29,7 +29,11 @@ const AppState = {
   clip: null,        // {id,title,score,signals,fileUrl,downloadUrl}
   sse: null,         // EventSource handle
   publish: { enabled: false, accounts: [] }, // OAuth publish destinations
+  clipsOffset: 0,    // pagination cursor for the clip library
+  clipsTotal: 0,     // total clips owned by the user
 };
+
+const CLIPS_PAGE = 12;
 
 // --- envelope-aware fetch ---
 async function api(path, opts = {}) {
@@ -130,7 +134,90 @@ async function loadMe() {
   try { AppState.user = await api("/api/auth/me"); }
   catch { AppState.user = null; }
   renderUser();
-  if (AppState.user) { await refreshJobs(); await loadPublish(); }
+  if (AppState.user) {
+    await refreshJobs();
+    await loadPublish();
+    await loadClips(true);
+    await loadAnalytics(false);
+  }
+}
+
+// --- Feature C: clip library (paginated) ---
+async function loadClips(reset = false) {
+  if (reset) { AppState.clipsOffset = 0; }
+  let data;
+  try {
+    data = await api(`/api/clips?limit=${CLIPS_PAGE}&offset=${AppState.clipsOffset}`);
+  } catch { return; }
+  AppState.clipsTotal = data.total;
+  renderClipLibrary(data.items, !reset);
+  AppState.clipsOffset += data.items.length;
+  const more = $("load-more-clips");
+  if (more) more.classList.toggle("hidden", AppState.clipsOffset >= AppState.clipsTotal);
+  const total = $("clips-total");
+  if (total) total.textContent = AppState.clipsTotal ? `${AppState.clipsTotal} clip(s)` : "";
+}
+
+function renderClipLibrary(items, append) {
+  const box = $("clip-library");
+  if (!box) return;
+  if (!append) box.innerHTML = "";
+  if (!items.length && !append) {
+    box.innerHTML = '<p class="faint">Your rendered clips will appear here.</p>';
+    return;
+  }
+  for (const c of items) {
+    const src = c.source && c.source.kind === "youtube" ? "YouTube" : "Upload";
+    const when = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "";
+    const card = document.createElement("div");
+    card.className = "glass";
+    card.style.cssText = "padding:10px; border-radius:12px";
+    card.innerHTML =
+      `<video src="${c.fileUrl}" preload="none" controls playsinline ` +
+      `style="width:100%; aspect-ratio:9/16; background:#000; border-radius:8px"></video>` +
+      `<div class="row" style="justify-content:space-between; align-items:center; margin-top:8px; gap:8px">` +
+      `<span class="chip">score ${Number(c.score).toFixed(2)}</span>` +
+      `<a class="btn btn-accent" href="${c.downloadUrl}" data-action="download" download>Download</a></div>` +
+      `<div class="faint" style="font-size:12px; margin-top:6px">${src} · ${when}</div>`;
+    box.appendChild(card);
+  }
+}
+
+// --- Feature C: connected-channel analytics ---
+async function loadAnalytics(force) {
+  const body = $("analytics-body");
+  const updated = $("analytics-updated");
+  if (!body) return;
+  let a;
+  try { a = await api(`/api/publish/analytics${force ? "?force=true" : ""}`); }
+  catch (e) {
+    body.innerHTML = e.code === "deferred"
+      ? "Analytics enable once publishing is configured."
+      : `Could not load analytics: ${e.message}`;
+    return;
+  }
+  if (!a.connected) { body.textContent = "Connect YouTube to see analytics for your channel."; if (updated) updated.textContent = ""; return; }
+  if (a.needsReconnect) {
+    body.innerHTML = `${a.reason || "Reconnect required."} ` +
+      `<button class="btn" data-action="connect-youtube" style="margin-left:8px">Reconnect YouTube</button>`;
+    if (updated) updated.textContent = "";
+    return;
+  }
+  if (updated) updated.textContent = a.lastUpdated
+    ? `updated ${new Date(a.lastUpdated).toLocaleTimeString()}${a.stale ? " (cached)" : ""}` : "";
+  if (!a.channels || !a.channels.length) { body.textContent = "No channel data yet."; return; }
+  body.classList.remove("faint");
+  body.innerHTML = a.channels.map((ch) => {
+    const l = ch.last28 || {};
+    const stat = (label, val) =>
+      `<div style="flex:1; min-width:110px"><div class="faint" style="font-size:12px">${label}</div>` +
+      `<div style="font-size:20px; font-weight:700">${(val ?? 0).toLocaleString()}</div></div>`;
+    return `<div style="margin-top:6px"><b>${ch.title || "Channel"}</b>` +
+      `<div class="row" style="gap:14px; flex-wrap:wrap; margin-top:8px">` +
+      stat("Subscribers", ch.subscribers) + stat("Total views", ch.totalViews) +
+      stat("Views (28d)", l.views) + stat("Likes (28d)", l.likes) +
+      stat("Watch min (28d)", l.minutesWatched) + `</div></div>`;
+  }).join("");
 }
 
 async function loadPublish() {
@@ -291,6 +378,14 @@ const actions = {
     } finally {
       if (btn) btn.disabled = false;
     }
+  },
+
+  async "load-more-clips"() { await loadClips(false); },
+
+  async "refresh-analytics"() {
+    const btn = $("analytics-refresh");
+    if (btn) btn.disabled = true;
+    try { await loadAnalytics(true); } finally { if (btn) btn.disabled = false; }
   },
 
   download() { /* href on the anchor handles the actual download */ },

@@ -37,6 +37,45 @@ def _serve(clip: Clip, *, download: bool = False):
     return FileResponse(clip.file_path, media_type="video/mp4")
 
 
+@router.get("")
+def list_clips(
+    limit: int = 20,
+    offset: int = 0,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Paginated, newest-first list of THIS user's rendered clips (across all jobs)."""
+    limit = max(1, min(limit, 100))
+    offset = max(0, offset)
+    q = (
+        db.query(Clip, Job)
+        .join(Job, Clip.job_id == Job.id)
+        .filter(Job.user_id == user.id)
+        .order_by(Clip.created_at.desc())
+    )
+    total = q.count()
+    items = []
+    for clip, job in q.limit(limit).offset(offset).all():
+        items.append({
+            "id": clip.id,
+            "title": clip.title,
+            "score": round(clip.score, 4),
+            "startS": clip.start_s,
+            "endS": clip.end_s,
+            "createdAt": clip.created_at.isoformat() if clip.created_at else None,
+            # Never leak local upload paths; only the YouTube URL is user-facing.
+            "source": {
+                "kind": job.kind.value,
+                "ref": job.source_ref if job.kind.value == "youtube" else "Uploaded video",
+                "jobId": job.id,
+            },
+            "jobStatus": job.status.value,
+            "fileUrl": f"/api/clips/{clip.id}/file",
+            "downloadUrl": f"/api/clips/{clip.id}/download",
+        })
+    return ok({"items": items, "total": total, "limit": limit, "offset": offset})
+
+
 @router.get("/{clip_id}")
 def clip_meta(clip_id: str, user: User = Depends(current_user), db: Session = Depends(get_db)):
     clip = _owned_clip(clip_id, user, db)

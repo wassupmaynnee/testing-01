@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from .config import get_settings
 from .crypto import decrypt, encrypt
@@ -25,11 +26,14 @@ from .crypto import decrypt, encrypt
 # Frozen visibility — uploads are private, full stop.
 PRIVATE_VISIBILITY = "private"
 
-# Minimal scope: upload to the user's own channel + read the channel title so we
-# can label the connected account. No read of other people's data.
+# Scopes: upload to the user's own channel, read the channel title/stats to label
+# and report on the connected account, and read the account's OWN analytics. No
+# read of other people's data.
+ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly"
 YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",
+    ANALYTICS_SCOPE,
 ]
 PROVIDER_YOUTUBE = "youtube"
 
@@ -200,6 +204,101 @@ def disconnect(db, user, provider: str) -> bool:
     db.delete(account)
     db.commit()
     return True
+
+
+# --------------------------------------------------------------------------- #
+# Analytics — the connected channel's OWN metrics (read-only).                 #
+#                                                                              #
+# "Real-time" done honestly: results are cached for _ANALYTICS_TTL to respect  #
+# YouTube's quotas, stamped with lastUpdated, and on any quota/rate-limit/      #
+# network error we serve the last-known values marked stale instead of         #
+# crashing. Only data for the user's OWN connected+authorized channel is ever  #
+# surfaced (private-by-default respected).                                     #
+# --------------------------------------------------------------------------- #
+_ANALYTICS_TTL = 300  # seconds
+_ANALYTICS_CACHE: dict[str, tuple[float, dict]] = {}
+
+
+def _fetch_youtube_analytics(db, account) -> dict:
+    from googleapiclient.discovery import build  # noqa: PLC0415
+
+    creds = _credentials_for(db, account)
+    yt = build("youtube", "v3", credentials=creds, cache_discovery=False)
+    ya = build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
+
+    end = date.today()
+    start = end - timedelta(days=28)
+    channels = []
+    for it in yt.channels().list(part="snippet,statistics", mine=True).execute().get("items", []):
+        stats = it.get("statistics", {})
+        row = {
+            "channelId": it.get("id"),
+            "title": it.get("snippet", {}).get("title"),
+            "subscribers": int(stats.get("subscriberCount", 0)),
+            "totalViews": int(stats.get("viewCount", 0)),
+            "videos": int(stats.get("videoCount", 0)),
+            "last28": None,
+        }
+        try:
+            rep = ya.reports().query(
+                ids="channel==MINE",
+                startDate=start.isoformat(),
+                endDate=end.isoformat(),
+                metrics="views,likes,estimatedMinutesWatched,subscribersGained",
+            ).execute()
+            totals = (rep.get("rows") or [[0, 0, 0, 0]])[0]
+            row["last28"] = {
+                "views": int(totals[0]), "likes": int(totals[1]),
+                "minutesWatched": int(totals[2]), "subscribersGained": int(totals[3]),
+            }
+        except Exception:  # noqa: BLE001,S110 — analytics report can fail independently of channel stats
+            pass
+        channels.append(row)
+    return {
+        "connected": True, "needsReconnect": False, "channels": channels,
+        "accountLabel": account.account_label,
+        "lastUpdated": datetime.now(timezone.utc).isoformat(), "stale": False,
+    }
+
+
+def channel_analytics(db, user, force: bool = False) -> dict:
+    """The user's connected-channel analytics with a lastUpdated stamp. Cached to
+    respect quotas. Prompts reconnect (does NOT crash) when an older token lacks
+    the analytics scope."""
+    from .models import OAuthAccount
+
+    account = (
+        db.query(OAuthAccount)
+        .filter(OAuthAccount.user_id == user.id, OAuthAccount.provider == PROVIDER_YOUTUBE)
+        .one_or_none()
+    )
+    if account is None:
+        return {"connected": False, "channels": [], "lastUpdated": None}
+
+    if ANALYTICS_SCOPE not in (account.scope or "").split():
+        return {
+            "connected": True, "needsReconnect": True,
+            "reason": "Reconnect YouTube to grant analytics access.",
+            "accountLabel": account.account_label, "channels": [], "lastUpdated": None,
+        }
+
+    now = time.time()
+    cached = _ANALYTICS_CACHE.get(user.id)
+    if not force and cached and now - cached[0] < _ANALYTICS_TTL:
+        return cached[1]
+    try:
+        data = _fetch_youtube_analytics(db, account)
+    except Exception as exc:  # noqa: BLE001 — quota/rate-limit/network: serve last-known
+        if cached:
+            stale = dict(cached[1])
+            stale.update(stale=True, error=str(exc))
+            return stale
+        return {
+            "connected": True, "channels": [], "error": str(exc),
+            "accountLabel": account.account_label, "lastUpdated": None, "stale": True,
+        }
+    _ANALYTICS_CACHE[user.id] = (now, data)
+    return data
 
 
 # --------------------------------------------------------------------------- #

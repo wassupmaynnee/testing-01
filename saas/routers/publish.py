@@ -32,6 +32,17 @@ def list_providers(user: User = Depends(current_user), db: Session = Depends(get
     })
 
 
+@router.get("/analytics")
+def analytics(force: bool = False, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    """Read-only analytics for the user's OWN connected YouTube channel. Cached to
+    respect quotas; ?force=true refreshes. Prompts reconnect if the stored token
+    predates the analytics scope."""
+    if not publish_core.youtube_enabled():
+        return deferred("YouTube analytics",
+                        "set YOUTUBE_OAUTH_CLIENT_ID / _SECRET to enable publishing")
+    return ok(publish_core.channel_analytics(db, user, force=force))
+
+
 @router.get("/youtube/connect")
 def youtube_connect(user: User = Depends(current_user)):
     """Return the Google consent URL the dashboard redirects the user to."""
