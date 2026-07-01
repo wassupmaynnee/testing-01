@@ -13,8 +13,11 @@ export interface Feature {
 
 export interface Tier {
   name: string
-  price: string
-  cadence: string
+  // Amounts mirror the backend catalog (saas/billing_core.py pricing_table()),
+  // which is the single source of truth for what is actually charged. annualUsd
+  // is the yearly total (= monthlyUsd * 12; existing annual behaviour, no discount).
+  monthlyUsd: number
+  annualUsd: number
   credits: string
   note: string
   cta: string
@@ -111,8 +114,8 @@ export const FEATURES: Feature[] = [
 export const TIERS: Tier[] = [
   {
     name: 'Free',
-    price: '$0',
-    cadence: '',
+    monthlyUsd: 0,
+    annualUsd: 0,
     credits: '30 credits',
     note: 'one-time trial on signup',
     cta: 'Start free',
@@ -120,33 +123,35 @@ export const TIERS: Tier[] = [
   },
   {
     name: 'Starter',
-    price: '$14.99',
-    cadence: '/mo',
+    monthlyUsd: 14.99,
+    annualUsd: 179.88,
     credits: '200 credits',
-    note: 'billed annually',
+    note: 'per month',
     cta: 'Choose Starter',
     tierKey: 'starter',
   },
   {
     name: 'Pro',
-    price: '$29.99',
-    cadence: '/mo',
+    monthlyUsd: 29.99,
+    annualUsd: 359.88,
     credits: '500 credits',
-    note: 'billed annually',
+    note: 'per month',
     cta: 'Choose Pro',
     tierKey: 'pro',
     featured: true,
   },
   {
     name: 'Scale',
-    price: '$59.99',
-    cadence: '/mo',
+    monthlyUsd: 59.99,
+    annualUsd: 719.88,
     credits: '1,200 credits',
-    note: 'billed annually',
+    note: 'per month',
     cta: 'Choose Scale',
     tierKey: 'scale',
   },
 ]
+
+export type BillingInterval = 'monthly' | 'annual'
 
 export const FAQS: Faq[] = [
   {

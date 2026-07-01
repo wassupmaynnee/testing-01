@@ -44,9 +44,14 @@ class Settings(BaseSettings):
     # price_data built from the frozen catalog so checkout still works in test mode.
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
-    stripe_price_starter: str = ""
+    stripe_price_starter: str = ""       # annual Price IDs (blank -> inline price_data)
     stripe_price_pro: str = ""
     stripe_price_scale: str = ""
+    # Optional MONTHLY Price IDs. Blank -> inline monthly price_data is built from
+    # the frozen catalog (see saas/billing_core.py pricing_table()).
+    stripe_price_starter_monthly: str = ""
+    stripe_price_pro_monthly: str = ""
+    stripe_price_scale_monthly: str = ""
     # Where Stripe returns the buyer after hosted Checkout / Portal. Default to
     # the dashboard so a completed purchase lands the user straight in the app.
     billing_success_url: str = ""  # default derived from app_base_url below
@@ -65,6 +70,38 @@ class Settings(BaseSettings):
     youtube_oauth_client_id: str = ""
     youtube_oauth_client_secret: str = ""
     youtube_oauth_redirect_uri: str = "http://localhost:8011/api/publish/youtube/callback"
+
+    # --- Clip pipeline: how many clips to cut from one source video. Reuses the
+    # FROZEN engagement scoring to pick the top-N non-overlapping windows. Clamped
+    # to clips_per_video_max so one URL can't spawn an unbounded render job. ---
+    clips_per_video: int = 3
+    clips_per_video_max: int = 10
+
+    # --- Object storage (Cloudflare R2, S3-compatible via boto3). ENV-ONLY, never
+    # hard-coded. If any of bucket / access key / secret / (endpoint or account id)
+    # is blank, storage falls back to the local ./data volume and R2 stays a
+    # documented seam (see saas/storage.py). ---
+    r2_account_id: str = ""
+    r2_bucket: str = ""
+    r2_access_key_id: str = ""
+    r2_secret_access_key: str = ""
+    r2_endpoint_url: str = ""  # derived from account id below when blank
+
+    @property
+    def r2_endpoint(self) -> str:
+        if self.r2_endpoint_url:
+            return self.r2_endpoint_url
+        return f"https://{self.r2_account_id}.r2.cloudflarestorage.com" if self.r2_account_id else ""
+
+    @property
+    def r2_enabled(self) -> bool:
+        return bool(
+            self.r2_bucket and self.r2_access_key_id
+            and self.r2_secret_access_key and self.r2_endpoint
+        )
+
+    def clips_per_video_clamped(self) -> int:
+        return max(1, min(self.clips_per_video, self.clips_per_video_max))
 
     @property
     def success_url(self) -> str:

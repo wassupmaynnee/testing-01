@@ -53,6 +53,7 @@
     // into Stripe Checkout for that tier once the account is created.
     const params = new URLSearchParams(location.search);
     const nextTier = params.get("tier");
+    const nextInterval = params.get("interval") === "monthly" ? "monthly" : "annual";
     if (nextTier) {
       document.getElementById("lede").innerHTML =
         'Create your account to continue to <b style="color:var(--color-accent)">' +
@@ -86,7 +87,7 @@
         // Logged in via the mf_session cookie now. Continue to checkout if asked.
         if (nextTier && nextTier !== "free") {
           try {
-            const { url } = await postForm("/api/billing/checkout", { tier: nextTier });
+            const { url } = await postForm("/api/billing/checkout", { tier: nextTier, interval: nextInterval });
             if (url) { location.href = url; return; }
           } catch (_) { /* billing disabled / error -> just go to the app */ }
         }

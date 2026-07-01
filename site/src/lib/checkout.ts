@@ -1,20 +1,24 @@
-import { APP_LINKS } from '../data/content'
+import { APP_LINKS, type BillingInterval } from '../data/content'
 
 /**
  * Take a visitor from a pricing CTA into the right next step:
  *  - Free            -> signup.
- *  - Paid, logged in -> POST /api/billing/checkout and redirect to Stripe.
- *  - Paid, logged out OR billing disabled -> signup carrying the tier, which
- *    continues to checkout right after the account is created.
+ *  - Paid, logged in -> POST /api/billing/checkout (tier + interval) and redirect to Stripe.
+ *  - Paid, logged out OR billing disabled -> signup carrying the tier + interval,
+ *    which continues to checkout right after the account is created.
  * Progressive enhancement: the anchors still have a real href, so this only
  * upgrades the click when JS is available.
  */
-export async function startCheckout(tierKey: string): Promise<void> {
+export async function startCheckout(
+  tierKey: string,
+  interval: BillingInterval = 'annual',
+): Promise<void> {
   if (tierKey === 'free') {
     window.location.href = APP_LINKS.signup
     return
   }
-  const signupWithTier = `${APP_LINKS.signup}?tier=${encodeURIComponent(tierKey)}`
+  const signupWithTier =
+    `${APP_LINKS.signup}?tier=${encodeURIComponent(tierKey)}&interval=${encodeURIComponent(interval)}`
   try {
     const me = await fetch('/api/auth/me', { credentials: 'same-origin' })
     if (!me.ok) {
@@ -23,6 +27,7 @@ export async function startCheckout(tierKey: string): Promise<void> {
     }
     const body = new FormData()
     body.append('tier', tierKey)
+    body.append('interval', interval)
     const res = await fetch('/api/billing/checkout', {
       method: 'POST',
       body,

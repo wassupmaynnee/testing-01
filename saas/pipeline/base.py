@@ -26,10 +26,11 @@ class UploadSource(IngestSource):
 
 
 class YouTubeSource(IngestSource):
-    """DEFERRED: implement at pipeline/ingest_url.py (yt-dlp) in a later pass."""
+    """LIVE: download the YouTube URL via the sanctioned yt-dlp downloader."""
 
     def prepare(self, job: Job) -> str:
-        raise DeferredFeature("YouTube ingest deferred; implement at pipeline/ingest_url.py")
+        from .ingest_url import download  # lazy: keeps yt-dlp off non-YT paths
+        return download(job.source_ref, job.id)
 
 
 class TwitchSource(IngestSource):

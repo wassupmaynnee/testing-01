@@ -46,6 +46,9 @@ class User(Base):
     # Stripe customer handle — set on first checkout so the billing portal and
     # repeat purchases reuse one customer. Nullable until they buy.
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Billing interval chosen at the last checkout ("monthly" | "annual").
+    # Nullable until they buy; recorded idempotently by the Stripe webhook.
+    billing_interval: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all,delete-orphan")
