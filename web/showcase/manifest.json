@@ -1,0 +1,47 @@
+[
+ {
+  "file": "hook.mp4",
+  "poster": "hook.jpg",
+  "title": "The 3-second rule",
+  "kind": "talking-head insight",
+  "score": 0.4367,
+  "why": "Scored highest on hook (0.75) \u2014 opens strong.",
+  "rights": "Clippify-owned: self-authored script, synthesized voiceover, generated visuals; rendered by the Clippify pipeline."
+ },
+ {
+  "file": "tutorial.mp4",
+  "poster": "tutorial.jpg",
+  "title": "One video, a week of content",
+  "kind": "tutorial snippet",
+  "score": 0.3352,
+  "why": "Scored highest on pace (0.55) \u2014 keeps a fast pace.",
+  "rights": "Clippify-owned: self-authored script, synthesized voiceover, generated visuals; rendered by the Clippify pipeline."
+ },
+ {
+  "file": "meta.mp4",
+  "poster": "meta.jpg",
+  "title": "Live caption demo",
+  "kind": "product demo",
+  "score": 0.3005,
+  "why": "Scored highest on hook (0.55) \u2014 opens strong.",
+  "rights": "Clippify-owned: self-authored script, synthesized voiceover, generated visuals; rendered by the Clippify pipeline."
+ },
+ {
+  "file": "insight.mp4",
+  "poster": "insight.jpg",
+  "title": "Attention math",
+  "kind": "talking-head insight",
+  "score": 0.259,
+  "why": "Scored highest on pace (0.61) \u2014 keeps a fast pace.",
+  "rights": "Clippify-owned: self-authored script, synthesized voiceover, generated visuals; rendered by the Clippify pipeline."
+ },
+ {
+  "file": "energy.mp4",
+  "poster": "energy.jpg",
+  "title": "Stop editing manually",
+  "kind": "high-energy moment",
+  "score": 0.2079,
+  "why": "Scored highest on pace (0.69) \u2014 keeps a fast pace.",
+  "rights": "Clippify-owned: self-authored script, synthesized voiceover, generated visuals; rendered by the Clippify pipeline."
+ }
+]
