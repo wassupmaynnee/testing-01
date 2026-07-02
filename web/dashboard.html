@@ -52,16 +52,29 @@
     <!-- LOGIN VIEW -->
     <section id="view-login" class="glass panel" style="max-width:420px; margin: 6vh auto;">
       <h2>Sign in</h2>
-      <p class="muted">Use the seeded dev account to run the demo.</p>
-      <div class="field"><label>Email</label>
+      <p class="muted">Welcome back — your clips are waiting.</p>
+      <div class="field"><label for="login-email">Email</label>
         <input id="login-email" type="email" value="demo@clippify.dev" autocomplete="username" /></div>
-      <div class="field"><label>Password</label>
+      <div class="field"><label for="login-password">Password</label>
         <input id="login-password" type="password" value="clippify-demo" autocomplete="current-password" /></div>
-      <button class="btn btn-accent" data-action="login" style="width:100%">Sign in</button>
+      <button class="btn btn-accent" data-action="login" style="width:100%; min-height:44px">Sign in</button>
+      <p class="muted" style="margin-top:14px; font-size:13px">New here? <a href="/signup">Create a free account</a> — no credit card, 30 free credits.</p>
     </section>
 
     <!-- APP VIEW -->
     <section id="view-app" class="hidden">
+      <!-- Onboarding checklist: 3 steps, dismissible, persisted in localStorage -->
+      <div class="glass panel" id="onboarding" style="margin-bottom:var(--gap); display:none">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h3 style="margin:0">Get your first clips</h3>
+          <button class="btn" data-action="dismiss-onboarding" aria-label="Dismiss checklist" style="min-height:44px">Dismiss</button>
+        </div>
+        <ol id="onboarding-steps" style="list-style:none; padding:0; margin:14px 0 0; display:grid; gap:10px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">
+          <li class="ob-step" data-step="video" style="padding:12px 14px; border-radius:12px; border:1px solid var(--glass-border)"><b>1.</b> Add a video<br/><span class="faint" style="font-size:12px">Upload an MP4 or paste a YouTube link</span></li>
+          <li class="ob-step" data-step="review" style="padding:12px 14px; border-radius:12px; border:1px solid var(--glass-border)"><b>2.</b> Review your clips<br/><span class="faint" style="font-size:12px">Check the score — higher = stronger moment</span></li>
+          <li class="ob-step" data-step="export" style="padding:12px 14px; border-radius:12px; border:1px solid var(--glass-border)"><b>3.</b> Download or publish<br/><span class="faint" style="font-size:12px">Post it exactly as it comes out</span></li>
+        </ol>
+      </div>
       <div class="grid">
         <div style="display:flex; flex-direction:column; gap:var(--gap)">
           <div class="glass panel">
@@ -69,49 +82,77 @@
               <h2 style="margin:0">New clip</h2>
               <span class="credits muted">Credits: <b id="credits">–</b></span>
             </div>
-            <p class="muted">Upload an MP4 or paste a YouTube URL. One credit per clip.</p>
-            <div class="dropzone" data-action="choose-file">
-              <div style="font-size:34px">⬆</div>
+            <p class="muted">Upload an MP4 or paste a YouTube URL — we find the moments worth posting.</p>
+            <div class="dropzone" data-action="choose-file" role="button" tabindex="0" aria-label="Choose an MP4 file to upload">
+              <div style="font-size:34px" aria-hidden="true">⬆</div>
               <div><b>Click to choose an MP4</b></div>
               <div class="faint" id="filename">No file selected</div>
             </div>
             <input id="file-input" type="file" accept="video/mp4,video/*" class="hidden" />
+            <p class="faint" style="font-size:12px; margin:10px 0 0" id="upload-cost" aria-live="polite">
+              Cost: <b style="color:var(--color-accent-hot)">1 credit per finished clip</b> — you’ll see the exact count before anything is charged.
+            </p>
             <button class="btn btn-accent" data-action="upload" id="upload-btn" disabled
-              style="width:100%; margin-top:14px">Generate clip</button>
+              style="width:100%; margin-top:12px; min-height:44px">Get my clips</button>
 
             <div class="row" style="align-items:center; gap:10px; margin:16px 0 10px">
               <span style="flex:1; height:1px; background:var(--glass-border)"></span>
               <span class="faint" style="font-size:12px">or from a link</span>
               <span style="flex:1; height:1px; background:var(--glass-border)"></span>
             </div>
+            <label class="faint" for="url-input" style="font-size:12px; display:block; margin-bottom:6px">YouTube link</label>
             <input id="url-input" type="url" inputmode="url"
               placeholder="https://youtube.com/watch?v=…"
-              style="width:100%; padding:11px 13px; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,.03); color:var(--color-text)" />
+              style="width:100%; padding:11px 13px; min-height:44px; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,.03); color:var(--color-text)" />
             <p class="faint" style="font-size:12px; margin:8px 0 0">
-              We’ll cut the <b>top <span id="clips-per-video">3</span> moments</b> into separate 9:16 clips.
+              We’ll cut the <b>top <span id="clips-per-video">3</span> moments</b> into separate 9:16 clips —
+              costs <b style="color:var(--color-accent-hot)">up to 3 credits</b> (1 per clip).
             </p>
             <button class="btn btn-accent" data-action="submit-url" id="url-btn"
-              style="width:100%; margin-top:12px">Generate clips from URL</button>
+              style="width:100%; margin-top:12px; min-height:44px">Get my clips from this link</button>
           </div>
 
           <div class="glass panel">
             <h3 style="margin-top:0">Progress</h3>
-            <div class="bar" style="margin-bottom:16px"><i id="progbar"></i></div>
-            <div class="stepper" id="stepper"></div>
+            <div class="bar" style="margin-bottom:16px" role="progressbar" aria-label="Pipeline progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="progwrap"><i id="progbar"></i></div>
+            <div class="stepper" id="stepper" aria-live="polite"></div>
           </div>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:var(--gap)">
           <div class="glass panel">
             <h3 style="margin-top:0">Your clip</h3>
-            <div id="clip-empty" class="faint">Your finished vertical clip will appear here.</div>
+            <div id="clip-empty" class="faint">
+              <span id="clip-empty-msg">Your finished vertical clip will appear here.</span>
+              <!-- Sample project: first session shows results, not an empty box -->
+              <div id="sample-project" style="display:none; margin-top:12px">
+                <div class="row" style="justify-content:space-between; align-items:center; margin-bottom:8px">
+                  <span class="chip">Sample project</span>
+                  <span class="faint" style="font-size:11px">made by Clippify from our demo footage</span>
+                </div>
+                <video id="sample-video" controls playsinline preload="none" aria-label="Sample clip produced by Clippify"></video>
+                <p class="faint" style="font-size:12px; margin-top:8px">This is real pipeline output — captions, crop, and timing untouched. Add a video above and yours will land here.</p>
+              </div>
+            </div>
             <div id="clip-box" class="hidden">
               <video id="clip-video" controls playsinline></video>
               <div class="row" style="justify-content:space-between; align-items:center; margin-top:12px">
-                <span class="chip" id="clip-score">score –</span>
-                <a class="btn btn-accent" id="download-link" data-action="download" download>Download</a>
+                <span class="chip" id="clip-score" title="Engagement score — weighted mix of hook, pace, emotion, and face presence">★ score –</span>
+                <a class="btn btn-accent" id="download-link" data-action="download" download style="min-height:44px">Download</a>
               </div>
+              <p class="faint" id="clip-why" style="font-size:12px; margin:8px 0 0"></p>
               <div class="signals" id="clip-signals"></div>
+
+              <!-- Export presets: same post-ready file, platform-labeled -->
+              <div style="margin-top:14px">
+                <div class="faint" style="font-size:12px; margin-bottom:8px">Export for</div>
+                <div class="row" style="gap:8px; flex-wrap:wrap" id="preset-row">
+                  <a class="btn" data-action="download" data-preset="tiktok" download style="min-height:44px">TikTok <span class="faint" style="font-size:10px; margin-left:6px">9:16 · 1080×1920</span></a>
+                  <a class="btn" data-action="download" data-preset="reels" download style="min-height:44px">Reels <span class="faint" style="font-size:10px; margin-left:6px">9:16 · H.264</span></a>
+                  <a class="btn" data-action="download" data-preset="shorts" download style="min-height:44px">Shorts <span class="faint" style="font-size:10px; margin-left:6px">9:16 · MP4</span></a>
+                </div>
+                <p class="faint" style="font-size:11px; margin:6px 0 0">One file fits all three — 1080×1920 H.264 MP4, the spec every platform accepts.</p>
+              </div>
 
               <div class="publish" style="margin-top:14px; border-top:1px solid var(--glass-border); padding-top:14px">
                 <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
@@ -162,7 +203,7 @@
     </section>
   </div>
 
-  <div id="toast" class="toast hidden"></div>
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
