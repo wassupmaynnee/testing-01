@@ -11,8 +11,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#0A0A0A" />
 
-  <title>Clippify — Turn long video into scroll-stopping vertical clips</title>
-  <meta name="description" content="Clippify turns long video into scroll-stopping vertical clips — transcribed, scored, reframed 9:16, and captioned automatically. 30 free credits, no GPU required." />
+  <title>Clippify — Turn one video into a week of content</title>
+  <meta name="description" content="Paste a link, get post-ready 9:16 clips with captions that stop the scroll. We find the moments people actually watch. No credit card — 30 free credits." />
   <link rel="canonical" href="https://clippify.app/" />
   <meta name="robots" content="index, follow" />
 
@@ -21,14 +21,14 @@
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Clippify" />
-  <meta property="og:title" content="Clippify — Turn long video into scroll-stopping vertical clips" />
-  <meta property="og:description" content="Upload an MP4; Clippify transcribes, scores, cuts, reframes 9:16 onto the speaker, and burns in captions. 30 free credits, no GPU required." />
+  <meta property="og:title" content="Clippify — Turn one video into a week of content" />
+  <meta property="og:description" content="Paste a link, get post-ready 9:16 clips with captions that stop the scroll. No credit card — 30 free credits." />
   <meta property="og:url" content="https://clippify.app/" />
   <meta property="og:image" content="https://clippify.app/og-image.png" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Clippify — AI vertical clips from long video" />
-  <meta name="twitter:description" content="Transcribe, score, cut, reframe 9:16, and caption — automatically. 30 free credits, no GPU required." />
+  <meta name="twitter:title" content="Clippify — Turn one video into a week of content" />
+  <meta name="twitter:description" content="We find the 30 seconds people actually watch — cropped 9:16 and captioned, ready to post." />
   <meta name="twitter:image" content="https://clippify.app/og-image.png" />
 
   <script type="application/ld+json">
@@ -38,8 +38,8 @@
     "name": "Clippify",
     "applicationCategory": "MultimediaApplication",
     "operatingSystem": "Web",
-    "description": "AI tool that turns long video into vertical, captioned clips.",
-    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier: 30 credits on signup." }
+    "description": "Turns long video into vertical, captioned clips ready to post.",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free tier: 30 credits on signup. No credit card required." }
   }
   </script>
 
@@ -52,209 +52,391 @@
   <script src="/static/runtime.js" defer></script>
 
   <style>
+    .skip-link { position:absolute; left:-9999px; top:0; z-index:100; background:var(--color-accent); color:#000; font-weight:700; padding:10px 16px; border-radius:0 0 10px 0; }
+    .skip-link:focus { left:0; }
+    :is(a,button,summary,input,[tabindex]):focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 6px; }
+
     .nav { display:flex; align-items:center; justify-content:space-between; gap:20px; padding: 20px 0; position:sticky; top:0; z-index:50;
       backdrop-filter: blur(10px); }
     .brand { font-family: var(--font-display); font-weight: 900; font-size: 22px; letter-spacing: -.03em; }
     .brand b { color: var(--color-accent); }
     .nav-links { display:none; gap:28px; }
-    .nav-links a { color: var(--color-text-dim); font-size:14px; font-weight:500; }
+    .nav-links a { color: var(--color-text-dim); font-size:14px; font-weight:500; padding:10px 2px; }
     .nav-links a:hover { color: var(--color-text); }
     @media (min-width: 880px){ .nav-links { display:flex; } }
+    .btn { min-height:44px; display:inline-flex; align-items:center; justify-content:center; }
 
-    .hero { display:grid; grid-template-columns: 1fr; gap:40px; align-items:center; padding: clamp(36px,7vw,80px) 0 60px; }
-    @media (min-width: 980px){ .hero { grid-template-columns: 1.1fr .9fr; } }
-    .hero h1 { font-size: clamp(40px, 7vw, 76px); font-weight: 900; max-width: 15ch; line-height:1.04; }
+    .hero { display:grid; grid-template-columns: 1fr; gap:40px; align-items:center; padding: clamp(36px,7vw,80px) 0 40px; }
+    @media (min-width: 980px){ .hero { grid-template-columns: 1.05fr .95fr; } }
+    .hero h1 { font-size: clamp(38px, 6.6vw, 72px); font-weight: 900; max-width: 14ch; line-height:1.04; }
     .hero h1 .accent { color: var(--color-accent); }
     .hero p.lede { font-size: clamp(17px, 2.1vw, 21px); color: var(--color-text-dim); max-width: 52ch; }
     .cta-row { display:flex; gap:14px; margin-top: 30px; flex-wrap:wrap; }
-    .subnote { margin-top: 18px; font-size: 13px; color: var(--color-text-faint); }
+    .subnote { margin-top: 18px; font-size: 14px; color: var(--color-text-dim); }
+    .subnote b { color: var(--color-accent-hot); }
 
-    /* 9:16 clip mock */
+    /* Showcase feed — For You style vertical clips */
+    .feed { display:flex; gap:16px; overflow-x:auto; scroll-snap-type:x mandatory; padding:8px 4px 16px; -webkit-overflow-scrolling:touch; }
+    .feed::-webkit-scrollbar { height:8px; }
+    .feed::-webkit-scrollbar-thumb { background:var(--glass-border); border-radius:8px; }
+    .feed-card { position:relative; flex:0 0 min(240px, 62vw); scroll-snap-align:center; border-radius:20px; overflow:hidden;
+      background:var(--color-surface-2); border:1px solid var(--glass-border); }
+    .feed-card video { display:block; width:100%; aspect-ratio:9/16; object-fit:cover; background:#000; }
+    .feed-card .score { position:absolute; top:10px; right:10px; font-size:11px; font-weight:800; color:#000;
+      background:var(--color-accent); border-radius:999px; padding:4px 10px; }
+    .feed-card .why { position:absolute; left:0; right:0; bottom:0; padding:26px 12px 10px; font-size:12px; color:#fff;
+      background:linear-gradient(transparent, rgba(0,0,0,.82)); }
+    .feed-card .sound { position:absolute; bottom:10px; right:10px; width:44px; height:44px; border-radius:999px; border:1px solid rgba(255,255,255,.25);
+      background:rgba(0,0,0,.55); color:#fff; font-size:16px; cursor:pointer; }
+    .feed-note { font-size:12px; color:var(--color-text-dim); margin-top:6px; }
+
+    /* 9:16 fallback mock (shown until showcase manifest loads) */
     .mock { position:relative; max-width: 300px; margin: 0 auto; }
     .mock .glow { position:absolute; inset:-24px; border-radius:40px; background: rgba(255,122,0,.20); filter: blur(48px); z-index:-1; }
     .mock .frame { padding:12px; }
     .mock .screen { position:relative; aspect-ratio: 9/16; border-radius:24px; overflow:hidden; background: var(--color-surface-3);
       background-image: linear-gradient(135deg, rgba(201,95,0,.30), var(--color-surface-2) 60%, var(--color-surface)); }
-    .mock .rec { position:absolute; top:12px; left:12px; font-size:10px; font-weight:700; color:#fff; background: rgba(255,77,77,.9); border-radius:999px; padding:2px 8px; }
-    .mock .tag { position:absolute; top:12px; right:12px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; }
     .mock .cap { position:absolute; left:0; right:0; bottom:54px; text-align:center; padding:0 16px; }
     .mock .cap span { display:inline-block; background: rgba(0,0,0,.55); color:#fff; font-weight:700; font-size:14px; padding:4px 8px; border-radius:8px; }
     .mock .cap b { color: var(--color-accent-hot); }
-    .mock .renderbar { position:absolute; left:0; right:0; bottom:0; height:6px; background: rgba(255,255,255,.1); overflow:hidden; }
-    .mock .renderbar i { display:block; height:100%; width:34%; background: linear-gradient(90deg, var(--color-accent-hot), var(--color-accent-deep)); animation: progress 2.4s ease-in-out infinite; }
-    .mock .pill { position:absolute; top:40px; right:-10px; font-size:11px; font-weight:700; padding:6px 12px; border-radius:999px; }
-    @keyframes progress { 0%{transform:translateX(-100%)} 100%{transform:translateX(250%)} }
+
+    /* honest proof strip */
+    .proof { display:flex; flex-wrap:wrap; gap:12px 28px; padding:18px 0 6px; color:var(--color-text-dim); font-size:14px; }
+    .proof span b { color:var(--color-text); }
 
     section { padding: 56px 0; }
     .eyebrow { margin-bottom: 14px; }
-    h2.sec { font-size: clamp(28px, 4vw, 40px); font-weight: 800; max-width: 18ch; }
+    h2.sec { font-size: clamp(28px, 4vw, 40px); font-weight: 800; max-width: 20ch; }
     .lead { color: var(--color-text-dim); max-width: 60ch; margin-top: 10px; }
 
     .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: var(--gap); margin-top: 30px; }
-    .card { padding: 24px; }
+    .card { padding: 24px; transition: transform .2s ease, box-shadow .2s ease; }
+    .card:hover { transform: translateY(-3px); box-shadow: var(--glass-shadow), 0 10px 34px rgba(255,122,0,.10); }
     .card h3 { font-size: 19px; margin-bottom: 8px; }
+    .card p { color: var(--color-text-dim); font-size: 14.5px; }
     .step-n { font-family: var(--font-display); font-weight:900; color: var(--color-accent); font-size: 14px; }
 
-    .pricing { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: var(--gap); margin-top: 30px; align-items:stretch; }
-    .tier { padding: 26px; display:flex; flex-direction:column; gap:6px; position:relative; }
+    /* before / after slider */
+    .ba { position:relative; max-width:760px; margin:30px auto 0; border-radius:20px; overflow:hidden; border:1px solid var(--glass-border); aspect-ratio:16/9; background:#000; }
+    .ba img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#000; }
+    .ba .after-wrap { position:absolute; inset:0; overflow:hidden; }
+    .ba .label { position:absolute; top:10px; font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; background:rgba(0,0,0,.6); color:#fff; z-index:3; }
+    .ba .label.before { left:10px; } .ba .label.after { right:10px; color:#000; background:var(--color-accent); }
+    .ba .divider { position:absolute; top:0; bottom:0; width:3px; background:var(--color-accent); z-index:2; }
+    .ba input[type=range] { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:ew-resize; z-index:4; }
+
+    /* calculator */
+    .calc { display:grid; gap:22px; grid-template-columns:1fr; margin-top:30px; padding:26px; }
+    @media (min-width:820px){ .calc { grid-template-columns: 1fr 1fr; } }
+    .calc label { font-size:14px; color:var(--color-text-dim); display:block; margin-bottom:8px; }
+    .calc output.big { font-family:var(--font-display); font-weight:900; font-size:44px; color:var(--color-accent-hot); display:block; line-height:1.1; }
+    .calc .sub { color:var(--color-text-dim); font-size:13px; }
+    .calc input[type=range]{ width:100%; accent-color: var(--color-accent); min-height:44px; }
+    .calc .stat + .stat { margin-top:16px; }
+
+    /* try-it-live */
+    .try { padding:26px; margin-top:30px; }
+    .try .rowi { display:flex; gap:12px; flex-wrap:wrap; }
+    .try input[type=url]{ flex:1; min-width:220px; min-height:48px; padding:10px 14px; border-radius:12px; border:1px solid var(--glass-border);
+      background:rgba(255,255,255,.04); color:var(--color-text); font-size:15px; }
+    .preview-tag { display:inline-block; font-size:11px; font-weight:800; letter-spacing:.06em; color:var(--color-accent-hot);
+      border:1px solid rgba(255,122,0,.4); padding:3px 10px; border-radius:999px; margin-bottom:10px; }
+    dialog#demo { border:1px solid var(--glass-border); border-radius:20px; background:var(--color-surface-2); color:var(--color-text);
+      padding:26px; max-width:460px; width:92vw; }
+    dialog#demo::backdrop { background:rgba(0,0,0,.7); backdrop-filter: blur(4px); }
+    .demo-steps { list-style:none; margin:18px 0; padding:0; display:flex; flex-direction:column; gap:10px; }
+    .demo-steps li { display:flex; align-items:center; gap:10px; font-size:14px; color:var(--color-text-faint); transition: color .2s; }
+    .demo-steps li .dot { width:10px; height:10px; border-radius:99px; background:var(--glass-border); flex:0 0 auto; }
+    .demo-steps li.active { color:var(--color-text); }
+    .demo-steps li.active .dot { background:var(--color-accent); }
+    .demo-steps li.done { color:var(--color-text-dim); }
+    .demo-steps li.done .dot { background:var(--color-accent-deep); }
+
+    .pricing { display:grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: var(--gap); margin-top: 26px; align-items:stretch; }
+    .tier { padding: 26px; display:flex; flex-direction:column; gap:6px; position:relative; transition: transform .2s ease; }
+    .tier:hover { transform: translateY(-3px); }
     .tier .price { font-family: var(--font-display); font-size: 40px; font-weight:900; line-height:1; margin-top:6px; }
     .tier .price small { font-size: 14px; color: var(--color-text-faint); font-weight:600; }
     .tier .credits { color: var(--color-accent-hot); font-weight:700; font-size:14px; margin-top:8px; }
-    .tier .note { color: var(--color-text-dim); font-size:13px; }
+    .tier .note { color: var(--color-text-dim); font-size:13px; min-height:34px; }
     .tier .spacer { flex:1; min-height:14px; }
     .tier.featured { border-color: var(--color-accent); box-shadow: 0 0 0 1px rgba(255,122,0,.45), var(--glass-shadow); }
     .tier .badge { position:absolute; top:-12px; left:24px; }
+    .interval-toggle { display:inline-flex; gap:4px; border:1px solid var(--glass-border); background:rgba(255,255,255,.04); border-radius:999px; padding:4px; margin-top:22px; }
+    .interval-toggle button { min-height:44px; min-width:104px; border:0; border-radius:999px; padding:8px 18px; font-weight:700; font-size:14px;
+      background:transparent; color:var(--color-text-dim); cursor:pointer; transition: background .2s, color .2s; }
+    .interval-toggle button[aria-pressed="true"] { background:var(--color-accent); color:#000; }
 
     details.faq { padding: 18px 22px; margin-top: 12px; }
-    details.faq summary { cursor:pointer; font-weight:700; list-style:none; display:flex; justify-content:space-between; gap:12px; }
+    details.faq summary { cursor:pointer; font-weight:700; list-style:none; display:flex; justify-content:space-between; gap:12px; min-height:28px; }
     details.faq summary::-webkit-details-marker { display:none; }
     details.faq summary::after { content:"+"; color: var(--color-accent); font-weight:900; }
     details.faq[open] summary::after { content:"–"; }
     details.faq p { color: var(--color-text-dim); margin: 12px 0 0; }
 
     footer { color: var(--color-text-faint); padding: 40px 0; font-size: 13px; border-top: 1px solid var(--glass-border); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
-    footer a { color: var(--color-text-faint); }
+    footer a { color: var(--color-text-faint); min-height:44px; display:inline-flex; align-items:center; }
     footer a:hover { color: var(--color-text-dim); }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior:auto !important; }
+    }
   </style>
 </head>
 <body>
+  <a class="skip-link" href="#main">Skip to content</a>
   <div class="wrap">
-    <nav class="nav" aria-label="Primary">
-      <a class="brand" href="/" aria-label="Clippify home">Clip<b>pify</b></a>
-      <div class="nav-links">
-        <a href="#how">How it works</a>
-        <a href="#features">Features</a>
-        <a href="#pricing">Pricing</a>
-        <a href="#faq">FAQ</a>
-      </div>
-      <div class="row" style="flex-wrap:nowrap">
-        <a class="btn" href="/dashboard">Sign in</a>
-        <a class="btn btn-accent" href="/signup">Start free</a>
-      </div>
-    </nav>
-
-    <header class="hero" id="hero">
-      <div>
-        <span class="chip">AI clip engine · vertical · captioned</span>
-        <h1 style="margin-top:18px">Turn long video into <span class="accent">scroll-stopping</span> vertical clips.</h1>
-        <p class="lede">Upload an MP4 and Clippify transcribes it, scores every moment for engagement,
-          cuts the best window, reframes it 9:16 onto the speaker, and burns in captions — start to finish.</p>
-        <div class="cta-row">
-          <a class="btn btn-accent" href="/signup">Start clipping free</a>
-          <a class="btn" href="#pricing">See pricing</a>
+    <header>
+      <nav class="nav" aria-label="Primary">
+        <a class="brand" href="/" aria-label="Clippify home">Clip<b>pify</b></a>
+        <div class="nav-links">
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#faq">FAQ</a>
         </div>
-        <p class="subnote">No GPU required · 30 free credits on signup · MP4 in, MP4 out</p>
-      </div>
-
-      <div class="mock" aria-hidden="true">
-        <div class="glow"></div>
-        <div class="glass frame">
-          <div class="screen">
-            <span class="rec">● REC</span>
-            <span class="glass tag">9:16</span>
-            <div class="cap"><span>this is the <b>moment</b> that hooks them</span></div>
-            <div class="renderbar"><i></i></div>
-          </div>
+        <div class="row" style="gap:10px">
+          <a class="btn" href="/dashboard">Sign in</a>
+          <a class="btn btn-accent" href="/signup">Get my clips — free</a>
         </div>
-        <div class="glass pill"><span style="color:var(--color-success)">●</span> Rendering clip…</div>
-      </div>
+      </nav>
     </header>
 
-    <section id="how">
-      <span class="chip eyebrow">How it works</span>
-      <h2 class="sec">Six stages, fully automatic</h2>
-      <p class="lead">The same pipeline the dashboard streams live, stages 0&rarr;6 — no manual editing in the loop.</p>
-      <div class="grid3">
-        <div class="glass card"><div class="step-n">01</div><h3>Transcribe audio</h3><p class="muted">Speech-to-text turns your full video into a word-timed transcript.</p></div>
-        <div class="glass card"><div class="step-n">02</div><h3>Score every moment</h3><p class="muted">A frozen model weighs hook, pace, sentiment, and on-screen face.</p></div>
-        <div class="glass card"><div class="step-n">03</div><h3>Select the strongest window</h3><p class="muted">The highest-scoring segment becomes your clip candidate.</p></div>
-        <div class="glass card"><div class="step-n">04</div><h3>Cut</h3><p class="muted">Clippify trims the source down to that single best window.</p></div>
-        <div class="glass card"><div class="step-n">05</div><h3>Reframe 9:16 onto the speaker</h3><p class="muted">Face tracking recenters the vertical crop on whoever is talking.</p></div>
-        <div class="glass card"><div class="step-n">06</div><h3>Burn in captions</h3><p class="muted">Word-timed subtitles are styled and rendered into the final clip.</p></div>
-      </div>
-    </section>
+    <main id="main">
+      <!-- HERO -->
+      <section class="hero" style="padding-bottom:20px">
+        <div>
+          <h1>Turn one video into a <span class="accent">week of content</span></h1>
+          <p class="lede">Paste a link or drop a file. Clippify finds the moments people actually watch, crops them 9:16, and burns in captions that stop the scroll — no editor, no timeline.</p>
+          <div class="cta-row">
+            <a class="btn btn-accent" href="/signup">Get my clips — free</a>
+            <a class="btn" href="#try">Try it live</a>
+          </div>
+          <p class="subnote"><b>No credit card — 30 free credits.</b> One credit = one finished clip.</p>
+          <div class="proof" aria-label="Product facts">
+            <span><b>Open source</b> · GPL-3.0</span>
+            <span><b>Word-timed captions</b> on every clip</span>
+            <span><b>No GPU needed</b> · runs on standard hardware</span>
+          </div>
+        </div>
 
-    <section id="features">
-      <span class="chip eyebrow">Features</span>
-      <h2 class="sec">Everything the clip needs, built in</h2>
-      <div class="grid3">
-        <div class="glass card"><h3>Engagement scoring</h3><p class="muted">A frozen weighting of hook, pace, sentiment, and on-screen face picks the strongest moment automatically.</p></div>
-        <div class="glass card"><h3>Speaker-tracked 9:16</h3><p class="muted">YuNet face detection keeps the talking head centered in the vertical crop.</p></div>
-        <div class="glass card"><h3>Captions burned in</h3><p class="muted">Word-timed subtitles, styled and rendered straight into the clip.</p></div>
-        <div class="glass card"><h3>Fast cloud rendering</h3><p class="muted">Clips render in the cloud in under a minute, so you can batch a whole episode in one sitting.</p></div>
-        <div class="glass card"><h3>No GPU required</h3><p class="muted">Everything runs on standard CPU — no graphics card, no local setup, nothing to install.</p></div>
-        <div class="glass card"><h3>Download-ready MP4</h3><p class="muted">Export H.264 MP4 sized for TikTok, Reels, and Shorts — ready to post the moment it finishes.</p></div>
-      </div>
-    </section>
+        <!-- Showcase feed (real pipeline output). Fallback mock until manifest loads. -->
+        <div id="showcase-slot">
+          <div class="mock" id="hero-mock" aria-hidden="true">
+            <div class="glow"></div>
+            <div class="glass frame">
+              <div class="screen">
+                <div class="cap"><span>captions that <b>stop the scroll</b></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section id="pricing">
-      <span class="chip eyebrow">Pricing</span>
-      <h2 class="sec">Simple, credit-based plans</h2>
-      <p class="lead">Credits renew monthly. Annual billing on paid tiers. One credit = one rendered clip.</p>
-      <div class="pricing">
-        <div class="glass tier">
-          <h3>Free</h3>
-          <div class="price">$0</div>
-          <div class="credits">30 credits</div>
-          <div class="note">one-time trial on signup</div>
-          <div class="spacer"></div>
-          <a class="btn" href="/signup">Start free</a>
-        </div>
-        <div class="glass tier">
-          <h3>Starter</h3>
-          <div class="price">$14.99<small>/mo</small></div>
-          <div class="credits">200 credits</div>
-          <div class="note">billed annually</div>
-          <div class="spacer"></div>
-          <a class="btn" href="/signup?tier=starter" data-checkout="starter">Choose Starter</a>
-        </div>
-        <div class="glass tier featured">
-          <span class="chip badge">Most popular</span>
-          <h3>Pro</h3>
-          <div class="price">$29.99<small>/mo</small></div>
-          <div class="credits">500 credits</div>
-          <div class="note">billed annually</div>
-          <div class="spacer"></div>
-          <a class="btn btn-accent" href="/signup?tier=pro" data-checkout="pro">Choose Pro</a>
-        </div>
-        <div class="glass tier">
-          <h3>Scale</h3>
-          <div class="price">$59.99<small>/mo</small></div>
-          <div class="credits">1,200 credits</div>
-          <div class="note">billed annually</div>
-          <div class="spacer"></div>
-          <a class="btn" href="/signup?tier=scale" data-checkout="scale">Choose Scale</a>
-        </div>
-      </div>
-    </section>
+      <!-- SHOWCASE FEED -->
+      <section id="showcase" hidden>
+        <span class="chip eyebrow">Real output</span>
+        <h2 class="sec">These clips came straight out of the pipeline</h2>
+        <p class="lead">Made from our own demo footage, start to finish, with zero manual editing. The score badge is the same engagement score the app shows you.</p>
+        <div class="feed" id="feed" role="list" aria-label="Showcase clips"></div>
+        <p class="feed-note">Demo clips generated from Clippify-owned footage. Tap a clip for sound.</p>
+      </section>
 
-    <section id="faq">
-      <span class="chip eyebrow">FAQ</span>
-      <h2 class="sec">Questions, answered</h2>
-      <details class="glass faq"><summary>How long can my source video be?</summary><p>Upload anything from a 30-second take to a multi-hour podcast or webinar. Longer videos simply use more credits, since Clippify scans the entire transcript to find the strongest moment.</p></details>
-      <details class="glass faq"><summary>Do I need a GPU or special hardware?</summary><p>No. Clippify runs entirely in the cloud on standard CPUs. All you need is a browser and an MP4 to upload — there is nothing to install and no graphics card required.</p></details>
-      <details class="glass faq"><summary>What format are the clips?</summary><p>Every clip exports as a vertical 9:16 H.264 MP4 with captions burned in — ready to upload directly to TikTok, Instagram Reels, and YouTube Shorts.</p></details>
-      <details class="glass faq"><summary>How do credits work?</summary><p>One credit covers one rendered clip. Paid plans refresh their credit allowance every month on annual billing, and the Free tier includes a one-time 30-credit trial when you sign up.</p></details>
-      <details class="glass faq"><summary>Can I adjust the captions and framing?</summary><p>Clippify auto-places word-timed captions and tracks the speaker for the 9:16 crop, and you can fine-tune the wording, caption style, and framing before exporting the final MP4.</p></details>
-      <details class="glass faq"><summary>Which languages are supported?</summary><p>Transcription works across dozens of spoken languages, and captions are generated in the same language that is spoken in your video.</p></details>
-    </section>
+      <!-- HOW IT WORKS -->
+      <section id="how">
+        <span class="chip eyebrow">How it works</span>
+        <h2 class="sec">From link to post-ready in three steps</h2>
+        <div class="grid3">
+          <div class="glass card">
+            <div class="step-n">STEP 1</div>
+            <h3>Paste a link or drop a file</h3>
+            <p>YouTube URL or MP4 — either way, you're one click from clips. You see the credit cost before anything runs.</p>
+          </div>
+          <div class="glass card">
+            <div class="step-n">STEP 2</div>
+            <h3>AI finds the moments</h3>
+            <p>Every sentence gets scored for hook, pace, emotion, and presence. The peaks win. You never scrub a timeline again.</p>
+          </div>
+          <div class="glass card">
+            <div class="step-n">STEP 3</div>
+            <h3>Post-ready 9:16 clips</h3>
+            <p>Cropped onto the speaker, captioned word by word, exported for TikTok, Reels, and Shorts. Download and post.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FEATURES -->
+      <section id="features">
+        <span class="chip eyebrow">What you get</span>
+        <h2 class="sec">Built to earn the next three seconds</h2>
+        <div class="grid3">
+          <div class="glass card"><h3>We find the 30 seconds people actually watch</h3><p>The engagement engine scores every moment of your footage and keeps only the peaks — your best content, surfaced automatically.</p></div>
+          <div class="glass card"><h3>Captions that keep viewers past the 3-second mark</h3><p>Every word lands on beat, styled and burned in. No subtitle files, no syncing, nothing to fix in an editor.</p></div>
+          <div class="glass card"><h3>Post-ready for TikTok, Reels, and Shorts</h3><p>Full 1080×1920 vertical, cropped to keep the speaker centered. Upload the file exactly as it comes out.</p></div>
+          <div class="glass card"><h3>Drop a long stream, get a week of content</h3><p>One source video comes back as multiple ranked clips — enough to fill your posting calendar from a single session.</p></div>
+          <div class="glass card"><h3>Your face stays in frame, automatically</h3><p>Face tracking follows the speaker through the vertical crop, so you never get a clip of your own shoulder.</p></div>
+          <div class="glass card"><h3>Minutes from upload to download</h3><p>No GPU, no install, no render queue on your machine. It runs in the cloud while you do literally anything else.</p></div>
+        </div>
+      </section>
+
+      <!-- BEFORE / AFTER + CALCULATOR -->
+      <section id="value">
+        <span class="chip eyebrow">See the difference</span>
+        <h2 class="sec">Raw footage in, scroll-stopper out</h2>
+        <div class="ba glass" id="ba" hidden>
+          <span class="label before">RAW 16:9</span>
+          <span class="label after">FINISHED 9:16</span>
+          <img id="ba-before" alt="Raw 16:9 source frame before Clippify processing" loading="lazy" decoding="async" />
+          <div class="after-wrap" id="ba-clip"><img id="ba-after" alt="Finished 9:16 captioned clip frame after Clippify processing" loading="lazy" decoding="async" /></div>
+          <div class="divider" id="ba-divider"></div>
+          <input type="range" id="ba-range" min="0" max="100" value="50" aria-label="Drag to compare before and after frames" />
+        </div>
+
+        <div class="calc glass" id="calc">
+          <div>
+            <label for="calc-hours">Hours of footage you record per week: <b id="calc-hours-val" style="color:var(--color-text)">3</b></label>
+            <input type="range" id="calc-hours" min="1" max="20" value="3" step="1" />
+            <p class="sub" style="margin-top:14px">Assumptions shown so the math stays honest: 3 clips per source video, one source ≈ 1 hour of footage, ~20 minutes to cut one clip by hand. Clip renders run about a minute each on our stack.</p>
+          </div>
+          <div>
+            <div class="stat">
+              <output class="big" id="calc-clips" for="calc-hours">36</output>
+              <span class="sub">post-ready clips per month</span>
+            </div>
+            <div class="stat">
+              <output class="big" id="calc-saved" for="calc-hours">12h</output>
+              <span class="sub">editing time saved per month</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TRY IT LIVE -->
+      <section id="try">
+        <span class="chip eyebrow">Try it live</span>
+        <h2 class="sec">See what happens to your video — before you sign up</h2>
+        <div class="try glass">
+          <span class="preview-tag">PREVIEW — NOTHING IS PROCESSED</span>
+          <p class="lead" style="margin:0 0 16px">Paste any YouTube link and walk through the exact stages your video goes through. Real processing starts only after you create a free account.</p>
+          <div class="rowi">
+            <input type="url" id="try-url" inputmode="url" placeholder="https://youtube.com/watch?v=…" aria-label="YouTube URL to preview" />
+            <button class="btn btn-accent" id="try-btn" type="button">Preview my clips</button>
+          </div>
+        </div>
+        <dialog id="demo" aria-labelledby="demo-title">
+          <span class="preview-tag">PREVIEW — SIMULATED, NO COMPUTE USED</span>
+          <h3 id="demo-title" style="margin:4px 0 2px">Here's what your video goes through</h3>
+          <p class="sub" style="color:var(--color-text-dim); font-size:13px; margin:0">This walkthrough mirrors the real pipeline stages.</p>
+          <ol class="demo-steps" id="demo-steps" aria-live="polite"></ol>
+          <div class="row" style="gap:10px; flex-wrap:wrap">
+            <a class="btn btn-accent" id="demo-cta" href="/signup">Generate for real — free</a>
+            <button class="btn" type="button" id="demo-close">Close</button>
+          </div>
+          <p class="sub" style="color:var(--color-text-faint); font-size:12px; margin-top:12px">No credit card — 30 free credits on signup.</p>
+        </dialog>
+      </section>
+
+      <!-- PRICING -->
+      <section id="pricing">
+        <span class="chip eyebrow">Pricing</span>
+        <h2 class="sec">Pay for clips, not seats</h2>
+        <p class="lead">Credits renew monthly. One credit = one finished clip. Pick the billing cadence that suits you.</p>
+
+        <div class="interval-toggle" role="group" aria-label="Billing interval">
+          <button type="button" data-interval="monthly" aria-pressed="false">Monthly</button>
+          <button type="button" data-interval="annual" aria-pressed="true">Annual</button>
+        </div>
+
+        <div class="pricing">
+          <div class="glass tier">
+            <h3>Free</h3>
+            <div class="price">$0</div>
+            <div class="credits">30 credits</div>
+            <div class="note">No credit card — 30 free credits, one-time on signup</div>
+            <div class="spacer"></div>
+            <a class="btn" href="/signup">Start free — no card</a>
+          </div>
+          <div class="glass tier">
+            <h3>Starter</h3>
+            <div class="price" data-monthly="$14.99" data-annual="$179.88"><span class="amt">$179.88</span><small class="per">/yr</small></div>
+            <div class="credits">200 credits / month</div>
+            <div class="note" data-note-monthly="billed monthly" data-note-annual="$14.99/mo · billed annually">$14.99/mo · billed annually</div>
+            <div class="spacer"></div>
+            <a class="btn" href="/signup?tier=starter" data-checkout="starter">Choose Starter</a>
+          </div>
+          <div class="glass tier featured">
+            <span class="chip badge">Most popular</span>
+            <h3>Pro</h3>
+            <div class="price" data-monthly="$29.99" data-annual="$359.88"><span class="amt">$359.88</span><small class="per">/yr</small></div>
+            <div class="credits">500 credits / month</div>
+            <div class="note" data-note-monthly="billed monthly" data-note-annual="$29.99/mo · billed annually">$29.99/mo · billed annually</div>
+            <div class="spacer"></div>
+            <a class="btn btn-accent" href="/signup?tier=pro" data-checkout="pro">Choose Pro</a>
+          </div>
+          <div class="glass tier">
+            <h3>Scale</h3>
+            <div class="price" data-monthly="$59.99" data-annual="$719.88"><span class="amt">$719.88</span><small class="per">/yr</small></div>
+            <div class="credits">1,200 credits / month</div>
+            <div class="note" data-note-monthly="billed monthly" data-note-annual="$59.99/mo · billed annually">$59.99/mo · billed annually</div>
+            <div class="spacer"></div>
+            <a class="btn" href="/signup?tier=scale" data-checkout="scale">Choose Scale</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq">
+        <span class="chip eyebrow">FAQ</span>
+        <h2 class="sec">Questions, answered</h2>
+        <details class="glass faq"><summary>How long can my source video be?</summary><p>Anything from a 30-second take to a multi-hour podcast or stream. Longer videos use more credits because you get more clips out of them — the engine scans the whole transcript for the strongest moments.</p></details>
+        <details class="glass faq"><summary>Do I need a GPU or special hardware?</summary><p>No. Everything renders in the cloud on standard CPUs. If you can open a browser tab, you can ship clips.</p></details>
+        <details class="glass faq"><summary>What exactly do I download?</summary><p>Vertical 9:16 H.264 MP4s at 1080×1920 with captions burned in — the exact file TikTok, Instagram Reels, and YouTube Shorts want. No re-encoding, no editor pass.</p></details>
+        <details class="glass faq"><summary>How do credits work?</summary><p>One credit = one finished clip. The Free tier includes a one-time 30-credit trial (no credit card). Paid plans refresh their allowance every month, billed monthly or annually — your choice.</p></details>
+        <details class="glass faq"><summary>Can I adjust the captions and framing?</summary><p>Captions are word-timed and styled automatically, and face tracking keeps the speaker centered in the crop. You can fine-tune wording, caption style, and framing before exporting.</p></details>
+        <details class="glass faq"><summary>Which languages are supported?</summary><p>Transcription works across dozens of spoken languages, and captions come out in the language spoken in your video.</p></details>
+      </section>
+    </main>
 
     <footer>
-      <span>© 2026 Clippify · GPL-3.0 · Self-contained FastAPI + Postgres + Redis stack.</span>
-      <span class="row" style="gap:18px"><a href="/dashboard">Open app</a><a href="/signup">Start free</a><a href="#pricing">Pricing</a></span>
+      <span>© 2026 Clippify · <a href="https://www.gnu.org/licenses/gpl-3.0.html" rel="license">GPL-3.0</a> open source</span>
+      <span class="row" style="gap:18px"><a href="/dashboard">Open app</a><a href="/signup">Start free</a><a href="#pricing">Pricing</a><a href="/robots.txt">Robots</a></span>
     </footer>
   </div>
 
   <script>
-    // Smart pricing CTAs (frozen tiers). Logged-in -> Stripe checkout; logged-out
-    // or billing disabled -> /signup?tier=KEY (which continues to checkout after
-    // the account is created). Progressive enhancement over the real hrefs.
+    "use strict";
+    const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* ---- Billing interval toggle (frozen prices; annual = existing behaviour) ---- */
+    let INTERVAL = "annual";
+    const toggle = document.querySelector(".interval-toggle");
+    toggle.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-interval]");
+      if (!btn) return;
+      INTERVAL = btn.dataset.interval;
+      toggle.querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed", String(b === btn)));
+      document.querySelectorAll(".tier .price[data-monthly]").forEach(p => {
+        p.querySelector(".amt").textContent = p.dataset[INTERVAL];
+        p.querySelector(".per").textContent = INTERVAL === "monthly" ? "/mo" : "/yr";
+      });
+      document.querySelectorAll(".tier .note[data-note-monthly]").forEach(n => {
+        n.textContent = n.dataset[INTERVAL === "monthly" ? "noteMonthly" : "noteAnnual"];
+      });
+      document.querySelectorAll("[data-checkout]").forEach(a => {
+        const tier = a.getAttribute("data-checkout");
+        a.setAttribute("href", `/signup?tier=${tier}&interval=${INTERVAL}`);
+      });
+    });
+
+    /* ---- Smart pricing CTAs: logged-in -> Stripe checkout on the SELECTED interval ---- */
     async function startCheckout(tierKey) {
-      const signupWithTier = "/signup?tier=" + encodeURIComponent(tierKey);
+      const signupWithTier = `/signup?tier=${encodeURIComponent(tierKey)}&interval=${INTERVAL}`;
       try {
         const me = await fetch("/api/auth/me", { credentials: "same-origin" });
         if (!me.ok) { location.href = signupWithTier; return; }
-        const body = new FormData(); body.append("tier", tierKey);
+        const body = new FormData();
+        body.append("tier", tierKey);
+        body.append("interval", INTERVAL);
         const res = await fetch("/api/billing/checkout", { method: "POST", body, credentials: "same-origin" });
         const env = await res.json().catch(() => null);
         if (env && env.ok && env.data && env.data.url) { location.href = env.data.url; return; }
@@ -267,6 +449,113 @@
       e.preventDefault();
       startCheckout(el.getAttribute("data-checkout"));
     });
+
+    /* ---- Outcome calculator (assumptions printed in the UI) ---- */
+    const CLIPS_PER_SOURCE = 3, MIN_PER_MANUAL_CLIP = 20, WEEKS_PER_MONTH = 4;
+    const hoursEl = document.getElementById("calc-hours");
+    function recalc() {
+      const hrs = Number(hoursEl.value);
+      document.getElementById("calc-hours-val").textContent = String(hrs);
+      const clips = hrs * CLIPS_PER_SOURCE * WEEKS_PER_MONTH; // 1 source ≈ 1h footage
+      const savedH = Math.round((clips * MIN_PER_MANUAL_CLIP) / 60);
+      document.getElementById("calc-clips").textContent = String(clips);
+      document.getElementById("calc-saved").textContent = savedH + "h";
+    }
+    hoursEl.addEventListener("input", recalc);
+    recalc();
+
+    /* ---- Before/after slider ---- */
+    (function () {
+      const ba = document.getElementById("ba");
+      const before = document.getElementById("ba-before");
+      const after = document.getElementById("ba-after");
+      before.src = "/static/showcase/before.jpg";
+      after.src = "/static/showcase/after.jpg";
+      let loaded = 0;
+      const show = () => { if (++loaded === 2) ba.hidden = false; };
+      before.addEventListener("load", show); after.addEventListener("load", show);
+      const range = document.getElementById("ba-range");
+      const clipWrap = document.getElementById("ba-clip");
+      const divider = document.getElementById("ba-divider");
+      function setPos(v) {
+        clipWrap.style.clipPath = `inset(0 0 0 ${v}%)`;
+        divider.style.left = v + "%";
+      }
+      range.addEventListener("input", () => setPos(range.value));
+      setPos(50);
+    })();
+
+    /* ---- Try-it-live: simulated stage walkthrough (frozen labels, clearly a preview) ---- */
+    const STEP_LABELS = ["Queued","Probing media","Transcribing (ASR)","Scoring engagement","Selecting clip boundaries","Rendering (cut · reframe · subtitles)","Complete"];
+    const YT_RE = /^(https?:\/\/)?(www\.|m\.)?(youtube\.com\/(watch\?v=|shorts\/|live\/|embed\/)|youtu\.be\/)[\w\-]+/i;
+    const demo = document.getElementById("demo");
+    const stepsEl = document.getElementById("demo-steps");
+    let demoTimer = null;
+    document.getElementById("try-btn").addEventListener("click", () => {
+      const url = document.getElementById("try-url").value.trim();
+      if (!YT_RE.test(url)) {
+        document.getElementById("try-url").focus();
+        document.getElementById("try-url").setAttribute("aria-invalid", "true");
+        document.getElementById("try-url").placeholder = "Enter a valid YouTube URL to preview";
+        return;
+      }
+      document.getElementById("try-url").removeAttribute("aria-invalid");
+      document.getElementById("demo-cta").href = `/signup?demo_url=${encodeURIComponent(url)}`;
+      stepsEl.innerHTML = STEP_LABELS.map(l => `<li><span class="dot"></span>${l}</li>`).join("");
+      demo.showModal();
+      let i = 0;
+      const items = stepsEl.querySelectorAll("li");
+      const tick = () => {
+        items.forEach((li, n) => { li.classList.toggle("active", n === i); li.classList.toggle("done", n < i); });
+        if (i < STEP_LABELS.length - 1) { i++; demoTimer = setTimeout(tick, REDUCED ? 300 : 900); }
+        else { items[i].classList.add("active"); }
+      };
+      tick();
+    });
+    document.getElementById("demo-close").addEventListener("click", () => { clearTimeout(demoTimer); demo.close(); });
+    demo.addEventListener("close", () => clearTimeout(demoTimer));
+
+    /* ---- Showcase feed: real pipeline output, poster-first, lazy, muted autoplay in view ---- */
+    (async function () {
+      let manifest;
+      try {
+        const r = await fetch("/static/showcase/manifest.json");
+        if (!r.ok) return;
+        manifest = await r.json();
+      } catch (_) { return; }
+      if (!Array.isArray(manifest) || !manifest.length) return;
+
+      const feed = document.getElementById("feed");
+      for (const m of manifest) {
+        const card = document.createElement("div");
+        card.className = "feed-card";
+        card.setAttribute("role", "listitem");
+        card.innerHTML =
+          `<video src="/static/showcase/${m.file}" poster="/static/showcase/${m.poster}" preload="none" muted loop playsinline ` +
+          `controlslist="nodownload" aria-label="${m.title} — showcase clip"></video>` +
+          `<span class="score" title="Engagement score (hook, pace, emotion, presence)">★ ${Number(m.score).toFixed(2)}</span>` +
+          `<div class="why">${m.why}</div>` +
+          `<button class="sound" type="button" aria-label="Toggle sound">🔇</button>`;
+        feed.appendChild(card);
+        const v = card.querySelector("video");
+        card.querySelector(".sound").addEventListener("click", (e) => {
+          v.muted = !v.muted;
+          e.currentTarget.textContent = v.muted ? "🔇" : "🔊";
+          if (!v.muted) v.play().catch(() => {});
+        });
+      }
+      document.getElementById("showcase").hidden = false;
+      // Hero slot: swap mock for a mini feed pointer on wide screens? Keep mock — feed is its own section.
+      if (!REDUCED) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach(en => {
+            const v = en.target.querySelector("video");
+            if (en.isIntersecting) v.play().catch(() => {}); else v.pause();
+          });
+        }, { threshold: 0.6 });
+        feed.querySelectorAll(".feed-card").forEach(c => io.observe(c));
+      }
+    })();
   </script>
 </body>
 </html>
