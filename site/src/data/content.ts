@@ -117,8 +117,8 @@ export const TIERS: Tier[] = [
     monthlyUsd: 0,
     annualUsd: 0,
     credits: '30 credits',
-    note: 'one-time trial on signup',
-    cta: 'Start free',
+    note: 'No credit card — one-time trial on signup',
+    cta: 'Start free — no card',
     tierKey: 'free',
   },
   {
