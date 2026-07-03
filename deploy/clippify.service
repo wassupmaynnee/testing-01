@@ -1,0 +1,33 @@
+# Clippify — systemd unit that keeps the Dockerized stack (api + worker-in-process
+# + postgres + redis) running and brings it up on boot. Docker is the process
+# manager (restart policies live in docker-compose.saas.yml); this unit ensures
+# the whole compose project is up after a reboot and provides start/stop/status.
+#
+# Install:
+#   sudo cp deploy/clippify.service /etc/systemd/system/clippify.service
+#   sudo systemctl daemon-reload && sudo systemctl enable --now clippify
+#
+# The backend itself (uvicorn, single process, in-process worker daemon thread —
+# the model we settled on) runs inside the api container per the Dockerfile
+# ENTRYPOINT (wait-for-postgres -> alembic upgrade head -> seed -> uvicorn).
+
+[Unit]
+Description=Clippify SaaS (Docker Compose stack)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/clippify
+# All runtime secrets come from the compose env_file (./.env). Compose reads it.
+ExecStart=/usr/bin/docker compose -f docker-compose.saas.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose -f docker-compose.saas.yml down
+ExecReload=/usr/bin/docker compose -f docker-compose.saas.yml up -d --remove-orphans
+TimeoutStartSec=0
+User=clippify
+Group=docker
+
+[Install]
+WantedBy=multi-user.target
