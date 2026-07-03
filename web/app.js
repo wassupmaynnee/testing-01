@@ -122,11 +122,23 @@ function renderClip() {
   renderSample();
   if (!has) return;
   const c = AppState.clip;
-  $("clip-video").src = c.fileUrl;
+  const vid = $("clip-video");
+  vid.src = c.fileUrl;
+  if (c.thumbUrl) vid.poster = c.thumbUrl;
+  vid.preload = "metadata";
   $("clip-score").textContent = `★ ${(c.score ?? 0).toFixed(3)}`;
   $("download-link").href = c.downloadUrl;
   const why = $("clip-why");
-  if (why) why.textContent = whyLine(c.score, c.signals);
+  if (why) {
+    const srcLabel = c.source ? (c.source.kind === "youtube" ? c.source.ref : "uploaded video") : "";
+    const meta = [
+      srcLabel && `From ${srcLabel}`,
+      (c.startS != null && c.endS != null) && `${c.startS.toFixed(1)}s–${c.endS.toFixed(1)}s`,
+      c.duration && `${Math.round(c.duration)}s`,
+      c.aspect,
+    ].filter(Boolean).join(" · ");
+    why.textContent = `${whyLine(c.score, c.signals)}${meta ? "  (" + meta + ")" : ""}`;
+  }
   // Export presets — same post-ready file, platform-named download.
   document.querySelectorAll("#preset-row [data-preset]").forEach((a) => {
     a.href = c.downloadUrl;
@@ -227,21 +239,37 @@ async function loadMe() {
   }
 }
 
-// --- Feature C: clip library (paginated) ---
+// --- Clip library (paginated, score-first) ---
+function librarySkeleton() {
+  const box = $("clip-library");
+  if (!box) return;
+  box.innerHTML = Array.from({ length: 4 }).map(() =>
+    `<div class="glass" style="padding:10px; border-radius:12px" aria-hidden="true">
+       <div style="aspect-ratio:9/16; border-radius:8px; background:linear-gradient(110deg, rgba(255,255,255,.05) 30%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.05) 70%); background-size:200% 100%; animation:shimmer 1.2s linear infinite"></div>
+     </div>`).join("");
+}
+
 async function loadClips(reset = false) {
-  if (reset) { AppState.clipsOffset = 0; }
+  if (reset) { AppState.clipsOffset = 0; librarySkeleton(); }
   let data;
   try {
     data = await api(`/api/clips?limit=${CLIPS_PAGE}&offset=${AppState.clipsOffset}`);
-  } catch { return; }
+  } catch (e) {
+    toast(`Could not load your clips: ${e.message}`, "err");
+    const box = $("clip-library");
+    if (box && reset) box.innerHTML = '<p class="faint">Could not load clips — try refreshing.</p>';
+    return;
+  }
   AppState.clipsTotal = data.total;
   renderClipLibrary(data.items, !reset);
   AppState.clipsOffset += data.items.length;
   const more = $("load-more-clips");
   if (more) more.classList.toggle("hidden", AppState.clipsOffset >= AppState.clipsTotal);
   const total = $("clips-total");
-  if (total) total.textContent = AppState.clipsTotal ? `${AppState.clipsTotal} clip(s)` : "";
+  if (total) total.textContent = AppState.clipsTotal ? `${AppState.clipsTotal} clip(s) · best first` : "";
 }
+
+const ASPECT_CSS = { "9:16": "9/16", "3:4": "3/4", "1:1": "1/1" };
 
 function renderClipLibrary(items, append) {
   const box = $("clip-library");
@@ -254,18 +282,38 @@ function renderClipLibrary(items, append) {
   for (const c of items) {
     const src = c.source && c.source.kind === "youtube" ? "YouTube" : "Upload";
     const when = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : "";
+    const ar = ASPECT_CSS[c.aspect] || "9/16";
+    const dur = c.duration ? `${Math.round(c.duration)}s` : "";
+    const media = c.thumbUrl
+      ? `<div style="position:relative"><img src="${c.thumbUrl}" alt="${c.title} thumbnail" loading="lazy" style="width:100%; aspect-ratio:${ar}; object-fit:cover; background:#000; border-radius:8px" />` +
+        `<span style="position:absolute; right:8px; bottom:8px; font-size:11px; font-weight:800; background:rgba(0,0,0,.65); color:#fff; padding:2px 8px; border-radius:999px">${dur}</span>` +
+        `<span style="position:absolute; left:8px; top:8px; font-size:11px; font-weight:800; background:var(--color-accent); color:#000; padding:2px 8px; border-radius:999px">★ ${Number(c.score).toFixed(2)}</span></div>`
+      : `<video src="${c.fileUrl}" preload="metadata" playsinline style="width:100%; aspect-ratio:${ar}; background:#000; border-radius:8px"></video>`;
     const card = document.createElement("div");
     card.className = "glass";
-    card.style.cssText = "padding:10px; border-radius:12px";
-    card.innerHTML =
-      `<video src="${c.fileUrl}" preload="none" controls playsinline ` +
-      `style="width:100%; aspect-ratio:9/16; background:#000; border-radius:8px"></video>` +
+    card.style.cssText = "padding:10px; border-radius:12px; cursor:pointer";
+    card.setAttribute("data-action", "open-clip");
+    card.setAttribute("data-clip", c.id);
+    card.setAttribute("role", "button");
+    card.setAttribute("tabindex", "0");
+    card.setAttribute("aria-label", `Open clip: ${c.title}`);
+    card.innerHTML = media +
       `<div class="row" style="justify-content:space-between; align-items:center; margin-top:8px; gap:8px">` +
-      `<span class="chip">score ${Number(c.score).toFixed(2)}</span>` +
-      `<a class="btn btn-accent" href="${c.downloadUrl}" data-action="download" download>Download</a></div>` +
-      `<div class="faint" style="font-size:12px; margin-top:6px">${src} · ${when}</div>`;
+      `<span class="faint" style="font-size:12px">${src} · ${when}${c.featured ? " · <b style='color:var(--color-accent-hot)'>featured</b>" : ""}</span>` +
+      `<a class="btn" href="${c.downloadUrl}" data-action="download" download style="min-height:36px; padding:6px 12px">↓</a></div>`;
     box.appendChild(card);
   }
+}
+
+// Open a library clip in the player pane with full metadata.
+async function openClipDetail(clipId) {
+  let c;
+  try { c = await api(`/api/clips/${clipId}`); }
+  catch (e) { toast(e.message, "err"); return; }
+  AppState.clip = c;
+  renderClip();
+  const pane = $("clip-box");
+  if (pane) pane.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 // --- Feature C: connected-channel analytics ---
@@ -432,6 +480,8 @@ const actions = {
   },
 
   async "open-job"(el) { await openJob(el.dataset.job); },
+
+  async "open-clip"(el) { await openClipDetail(el.dataset.clip); },
 
   async "billing-portal"() {
     try {
