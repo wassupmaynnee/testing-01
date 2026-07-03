@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (
-    DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
+    Boolean, DateTime, Enum, Float, ForeignKey, Integer, String, Text, UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -91,6 +91,12 @@ class Clip(Base):
     pace: Mapped[float] = mapped_column(Float, default=0.0)
     sentiment: Mapped[float] = mapped_column(Float, default=0.0)
     face: Mapped[float] = mapped_column(Float, default=0.0)
+    # Library/showcase metadata (additive): poster thumbnail ref (local path or
+    # r2:// key), output aspect label ("9:16" | "3:4" | "1:1"), and the featured
+    # flag that opts a clip into the PUBLIC homepage showcase.
+    thumb_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aspect: Mapped[str] = mapped_column(String(8), default="9:16")
+    featured: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     job: Mapped[Job] = relationship(back_populates="clips")

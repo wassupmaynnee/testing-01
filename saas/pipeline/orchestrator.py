@@ -153,12 +153,22 @@ class SinglePassStrategy(PipelineStrategy):
                 else:
                     Path(vert_path).replace(final_path)
 
+                # Poster thumbnail for the library grid (best-effort).
+                thumb_ref = None
+                try:
+                    thumb_path = str(settings.clips_dir / f"{job.id}_{i}_thumb.jpg")
+                    ffmpeg.poster(final_path, thumb_path)
+                    thumb_ref = store_clip(thumb_path, f"clips/{job.id}_{i}_thumb.jpg")
+                except Exception as exc:  # noqa: BLE001
+                    print(f"[render] poster fallback ({exc})")
+
                 # Store (R2 when configured, else local) then persist the record.
                 ref = store_clip(final_path, f"clips/{job.id}_{i}.mp4")
                 clip = Clip(
                     job_id=job.id, title=f"Highlight {start_s:.0f}-{end_s:.0f}s",
                     file_path=ref, start_s=start_s, end_s=end_s, score=score,
                     hook=sig.hook, pace=sig.pace, sentiment=sig.sentiment, face=sig.face,
+                    thumb_path=thumb_ref, aspect="9:16",
                 )
                 db.add(clip)
                 if user is not None:

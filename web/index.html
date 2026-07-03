@@ -239,7 +239,11 @@
         <h2 class="sec">These clips came straight out of the pipeline</h2>
         <p class="lead">Made from our own demo footage, start to finish, with zero manual editing. The score badge is the same engagement score the app shows you.</p>
         <div class="feed" id="feed" role="list" aria-label="Showcase clips"></div>
-        <p class="feed-note">Demo clips generated from Clippify-owned footage. Tap a clip for sound.</p>
+        <p class="feed-note">Every clip here came out of the pipeline untouched. Tap a clip for sound.</p>
+        <div class="cta-row" style="margin-top:18px">
+          <a class="btn btn-accent" href="/signup">Get my clips — free</a>
+          <span class="subnote" style="margin:0; align-self:center"><b>No credit card — 30 free credits.</b></span>
+        </div>
       </section>
 
       <!-- HOW IT WORKS -->
@@ -515,26 +519,50 @@
     document.getElementById("demo-close").addEventListener("click", () => { clearTimeout(demoTimer); demo.close(); });
     demo.addEventListener("close", () => clearTimeout(demoTimer));
 
-    /* ---- Showcase feed: real pipeline output, poster-first, lazy, muted autoplay in view ---- */
+    /* ---- Showcase feed: featured clips from the live API (no hardcoded URLs),
+           falling back to the static manifest. Poster-first, lazy, muted
+           autoplay in view, tap for sound. ---- */
+    const ASPECT_CSS = { "9:16": "9/16", "3:4": "3/4", "1:1": "1/1" };
     (async function () {
-      let manifest;
-      try {
-        const r = await fetch("/static/showcase/manifest.json");
-        if (!r.ok) return;
-        manifest = await r.json();
-      } catch (_) { return; }
-      if (!Array.isArray(manifest) || !manifest.length) return;
+      let items = [];
+      try {  // 1) live featured clips (curated in the product itself)
+        const r = await fetch("/api/clips/featured");
+        if (r.ok) {
+          const env = await r.json();
+          if (env.ok && env.data.items.length) {
+            items = env.data.items.map(c => ({
+              src: c.fileUrl, poster: c.thumbUrl, title: c.title,
+              score: c.score, aspect: c.aspect || "9:16",
+              label: `${Math.round(c.duration || 0)}s — ${c.title}`,
+            }));
+          }
+        }
+      } catch (_) { /* fall through to static */ }
+      if (!items.length) {
+        try {  // 2) static fallback (repo demo clips)
+          const r = await fetch("/static/showcase/manifest.json");
+          if (r.ok) {
+            const manifest = await r.json();
+            items = manifest.map(m => ({
+              src: `/static/showcase/${m.file}`, poster: `/static/showcase/${m.poster}`,
+              title: m.title, score: m.score, aspect: "9:16", label: m.why,
+            }));
+          }
+        } catch (_) { return; }
+      }
+      if (!items.length) return;
 
       const feed = document.getElementById("feed");
-      for (const m of manifest) {
+      for (const m of items) {
         const card = document.createElement("div");
         card.className = "feed-card";
         card.setAttribute("role", "listitem");
+        const ar = ASPECT_CSS[m.aspect] || "9/16";
         card.innerHTML =
-          `<video src="/static/showcase/${m.file}" poster="/static/showcase/${m.poster}" preload="none" muted loop playsinline ` +
-          `controlslist="nodownload" aria-label="${m.title} — showcase clip"></video>` +
+          `<video src="${m.src}"${m.poster ? ` poster="${m.poster}"` : ""} preload="none" muted loop playsinline ` +
+          `controlslist="nodownload" style="aspect-ratio:${ar}" aria-label="${m.title} — showcase clip"></video>` +
           `<span class="score" title="Engagement score (hook, pace, emotion, presence)">★ ${Number(m.score).toFixed(2)}</span>` +
-          `<div class="why">${m.why}</div>` +
+          `<div class="why">${m.label}</div>` +
           `<button class="sound" type="button" aria-label="Toggle sound">🔇</button>`;
         feed.appendChild(card);
         const v = card.querySelector("video");
@@ -545,7 +573,6 @@
         });
       }
       document.getElementById("showcase").hidden = false;
-      // Hero slot: swap mock for a mini feed pointer on wide screens? Keep mock — feed is its own section.
       if (!REDUCED) {
         const io = new IntersectionObserver((entries) => {
           entries.forEach(en => {

@@ -60,6 +60,13 @@ def crop_to_vertical(src: str, dst: str, crop_w: int, crop_h: int, x: int, y: in
     subprocess.run(cmd, check=True, capture_output=True, text=True)
 
 
+def poster(src: str, dst_jpg: str, at: float = 1.2) -> None:
+    """Extract a poster frame (thumbnail) from a rendered clip."""
+    cmd = [_ffmpeg(), "-y", "-ss", f"{at:.2f}", "-i", src,
+           "-frames:v", "1", "-q:v", "4", dst_jpg]
+    subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+
 def burn_subtitles(src: str, ass_path: str, dst: str) -> None:
     """Burn an ASS subtitle track into the video."""
     escaped = ass_path.replace("\\", "/").replace(":", "\\:")
