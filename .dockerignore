@@ -2,6 +2,12 @@
 # `COPY . .` and serves the PRE-BUILT site/dist (no Node stage), so dist stays
 # in — only build/runtime cruft and local venvs are excluded.
 
+# Secrets — never bake real .env into the image (runtime env comes from
+# compose env_file / the host). Only .env.example is safe.
+.env
+.env.*
+!.env.example
+
 # VCS
 .git
 .gitignore
