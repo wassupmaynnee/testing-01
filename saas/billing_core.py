@@ -61,6 +61,12 @@ VALID_INTERVALS = ("monthly", "annual")
 DEFAULT_INTERVAL = "annual"
 ANNUAL_MONTHS_BILLED = 12  # annual total = 12 x monthly (frozen: no discount)
 
+# Refer-a-friend rewards (repo defines no prior amounts; spec'd values). Granted
+# ONLY inside the HMAC-verified webhook on the referred user's first paid
+# subscription — never on signup alone.
+REFERRAL_CREDITS_REFERRER = 100
+REFERRAL_CREDITS_REFERRED = 50
+
 
 def normalize_interval(interval: str | None) -> str:
     return interval if interval in VALID_INTERVALS else DEFAULT_INTERVAL
@@ -326,6 +332,37 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
                     reason=f"stripe:{tier.key}:{event_id}",
                 ))
                 target_user_id = user.id
+
+                # Referral reward — fires once, on the referred user's FIRST
+                # paid subscription. Rides this event's idempotency gate (the
+                # stripe_events PK check above) AND the pending->credited
+                # status flip, so retries and later renewals never re-grant.
+                from datetime import datetime, timezone
+
+                from .models import Referral, User as _User
+                referral = (
+                    db.query(Referral)
+                    .filter(Referral.referred_user_id == user.id,
+                            Referral.status == "pending")
+                    .one_or_none()
+                )
+                if referral is not None:
+                    referrer = db.get(_User, referral.referrer_id)
+                    if referrer is not None and referrer.id != user.id:
+                        referrer.credits += REFERRAL_CREDITS_REFERRER
+                        user.credits += REFERRAL_CREDITS_REFERRED
+                        db.add(referrer)
+                        db.add(CreditLedger(
+                            user_id=referrer.id, delta=REFERRAL_CREDITS_REFERRER,
+                            reason=f"referral:reward:{user.id}:{event_id}"))
+                        db.add(CreditLedger(
+                            user_id=user.id, delta=REFERRAL_CREDITS_REFERRED,
+                            reason=f"referral:bonus:{event_id}"))
+                        referral.status = "credited"
+                        referral.credits_referrer = REFERRAL_CREDITS_REFERRER
+                        referral.credits_referred = REFERRAL_CREDITS_REFERRED
+                        referral.credited_at = datetime.now(timezone.utc)
+                        db.add(referral)
 
         # Record the event so it commits atomically with the grant.
         db.add(StripeEvent(

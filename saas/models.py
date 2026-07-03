@@ -49,6 +49,10 @@ class User(Base):
     # Billing interval chosen at the last checkout ("monthly" | "annual").
     # Nullable until they buy; recorded idempotently by the Stripe webhook.
     billing_interval: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # Refer-a-friend: this user's shareable code (/r/<code>). Unique, generated
+    # on account creation; backfilled for older accounts by migration 0006.
+    referral_code: Mapped[str | None] = mapped_column(String(16), unique=True,
+                                                      index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="user", cascade="all,delete-orphan")
@@ -127,6 +131,25 @@ class StripeEvent(Base):
     user_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     credits_granted: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
+class Referral(Base):
+    """Refer-a-friend attribution. Created PENDING at referred signup; flips to
+    CREDITED only inside the HMAC-verified Stripe webhook when the referred
+    user's first paid subscription completes. One row per referred user, ever
+    (unique constraint), so a reward can never double-fire; the surrounding
+    stripe_events id gate makes webhook retries no-ops."""
+    __tablename__ = "referrals"
+    __table_args__ = (UniqueConstraint("referred_user_id", name="uq_referral_referred_once"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uuid)
+    referrer_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    referred_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending|credited
+    credits_referrer: Mapped[int] = mapped_column(Integer, default=0)
+    credits_referred: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+    credited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OAuthAccount(Base):
