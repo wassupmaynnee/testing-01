@@ -505,7 +505,13 @@
       }
       document.getElementById("try-url").removeAttribute("aria-invalid");
       document.getElementById("demo-cta").href = `/signup?demo_url=${encodeURIComponent(url)}`;
-      stepsEl.innerHTML = STEP_LABELS.map(l => `<li><span class="dot"></span>${l}</li>`).join("");
+      stepsEl.replaceChildren(...STEP_LABELS.map(l => {
+        const li = document.createElement("li");
+        const dot = document.createElement("span");
+        dot.className = "dot";
+        li.append(dot, document.createTextNode(l));
+        return li;
+      }));
       demo.showModal();
       let i = 0;
       const items = stepsEl.querySelectorAll("li");
