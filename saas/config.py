@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     # --- Clip pipeline: how many clips to cut from one source video. Reuses the
     # FROZEN engagement scoring to pick the top-N non-overlapping windows. Clamped
     # to clips_per_video_max so one URL can't spawn an unbounded render job. ---
+    max_upload_mb: int = 500        # upload hard cap (API4 resource limit)
     clips_per_video: int = 3
     clips_per_video_max: int = 10
 

@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import re
+import time as _time
 from pathlib import Path
 
 from ..config import get_settings
 from ..db import SessionLocal
 from ..models import Clip, CreditLedger, Job, JobStatus, User
 from ..render import ffmpeg, reframe, subtitles
+import logging
+
+from ..observability import CLIP_JOBS, CLIPS_RENDERED, log_event, metric_inc, observe_stage
 from ..scoring import Signals, engagement_score
 from ..sse import publish
 from ..storage import store_clip
@@ -18,11 +22,16 @@ _STRONG = {"amazing", "incredible", "never", "best", "worst", "love", "hate",
            "wow", "crazy", "huge", "secret", "wrong", "shocking", "insane"}
 _TARGET_LEN = 30.0
 _STEP = 5.0
+_stage_clock: dict[str, float] = {}
 
 
 def _update(db, job: Job, *, stage=None, progress=None, status=None,
             message="", **extra) -> None:
     if stage is not None:
+        prev = _stage_clock.get(job.id)
+        if prev is not None:
+            observe_stage(str(job.stage), _time.perf_counter() - prev)
+        _stage_clock[job.id] = _time.perf_counter()
         job.stage = stage
     if progress is not None:
         job.progress = progress
@@ -135,7 +144,7 @@ class SinglePassStrategy(PipelineStrategy):
                 try:
                     reframe.reframe_vertical(cut_path, vert_path)
                 except Exception as exc:  # noqa: BLE001
-                    print(f"[render] reframe fallback ({exc})")
+                    log_event("reframe fallback", level=logging.WARNING, error=str(exc))
                     vert_path = cut_path
 
                 _update(db, job, stage=5, progress=round(base + 0.1, 3),
@@ -148,7 +157,7 @@ class SinglePassStrategy(PipelineStrategy):
                     try:
                         subtitles.burn(vert_path, ass_path, final_path)
                     except Exception as exc:  # noqa: BLE001
-                        print(f"[render] subtitle burn fallback ({exc})")
+                        log_event("subtitle burn fallback", level=logging.WARNING, error=str(exc))
                         Path(vert_path).replace(final_path)
                 else:
                     Path(vert_path).replace(final_path)
@@ -160,7 +169,7 @@ class SinglePassStrategy(PipelineStrategy):
                     ffmpeg.poster(final_path, thumb_path)
                     thumb_ref = store_clip(thumb_path, f"clips/{job.id}_{i}_thumb.jpg")
                 except Exception as exc:  # noqa: BLE001
-                    print(f"[render] poster fallback ({exc})")
+                    log_event("poster fallback", level=logging.WARNING, error=str(exc))
 
                 # Store (R2 when configured, else local) then persist the record.
                 ref = store_clip(final_path, f"clips/{job.id}_{i}.mp4")
@@ -174,16 +183,20 @@ class SinglePassStrategy(PipelineStrategy):
                 if user is not None:
                     user.credits -= 1
                     db.add(CreditLedger(user_id=user.id, delta=-1, reason=f"clip:{job.id}_{i}"))
+                metric_inc(CLIPS_RENDERED)
                 db.flush()
                 made.append(clip)
 
             if not made:
                 raise RuntimeError("No clips rendered (out of credits or no valid windows).")
 
+            metric_inc(CLIP_JOBS, outcome="completed")
+            _stage_clock.pop(job.id, None)
             _update(db, job, stage=6, progress=1.0, status=JobStatus.completed,
                     message=f"Complete — {len(made)} clip(s)",
                     clip_id=made[0].id, clipCount=len(made))
         except Exception as exc:  # noqa: BLE001
+            metric_inc(CLIP_JOBS, outcome="failed")
             db.rollback()
             job = db.get(Job, job_id)
             if job:

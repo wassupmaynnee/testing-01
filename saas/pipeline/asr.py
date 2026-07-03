@@ -1,7 +1,10 @@
 """Real ASR via faster-whisper, with a safe fallback so the app always boots."""
 from __future__ import annotations
 
+import logging
+
 from ..config import get_settings
+from ..observability import log_event
 
 _model_cache = {}
 
@@ -27,5 +30,5 @@ def transcribe(path: str) -> list[dict]:
             for s in segments
         ]
     except Exception as exc:  # noqa: BLE001 — degrade gracefully, never crash the worker
-        print(f"[asr] transcription unavailable ({exc}); continuing without captions")
+        log_event("ASR unavailable; continuing without captions", level=logging.WARNING, error=str(exc))
         return []

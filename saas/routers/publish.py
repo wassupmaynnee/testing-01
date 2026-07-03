@@ -8,6 +8,7 @@ from .. import publish_core
 from ..db import get_db
 from ..deps import current_user
 from ..models import Clip, Job, User
+from ..observability import log_event
 from ..responses import deferred, err, ok
 
 router = APIRouter(prefix="/api/publish", tags=["publish"])
@@ -107,5 +108,6 @@ def publish_clip(clip_id: str, user: User = Depends(current_user), db: Session =
     except FileNotFoundError:
         return err("clip_missing", "Clip file is no longer available.", status_code=404)
     except Exception as exc:  # noqa: BLE001 — surface upload/network errors cleanly
-        return err("publish_failed", f"Upload failed: {exc}", status_code=502)
+        log_event("publish failed", level=40, error=str(exc))
+        return err("publish_failed", "Upload to YouTube failed. Please try again.", status_code=502)
     return ok(result)

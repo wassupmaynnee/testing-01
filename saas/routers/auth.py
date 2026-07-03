@@ -8,9 +8,11 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from ..billing_core import tier_by_key
+from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import CreditLedger, Referral, User
+from ..ratelimit import rate_limit
 from ..responses import err, ok
 from ..security import SESSION_COOKIE, hash_password, issue_session, verify_password
 
@@ -23,14 +25,17 @@ _MIN_PASSWORD = 8
 
 
 def _issue_session_cookie(resp: JSONResponse, user_id: str) -> None:
-    """Single place that sets the frozen httponly mf_session cookie (login + signup)."""
+    """Single place that sets the frozen httponly mf_session cookie (login + signup).
+    Secure is enabled in production so the session never rides plain HTTP."""
     resp.set_cookie(
         SESSION_COOKIE, issue_session(user_id),
-        httponly=True, samesite="lax", max_age=60 * 60 * 24 * 7, path="/",
+        httponly=True, samesite="lax",
+        secure=get_settings().app_env == "production",
+        max_age=60 * 60 * 24 * 7, path="/",
     )
 
 
-@router.post("/signup")
+@router.post("/signup", dependencies=[Depends(rate_limit("signup", 5, 60))])
 def signup(
     email: str = Form(...),
     password: str = Form(...),
@@ -38,7 +43,7 @@ def signup(
     db: Session = Depends(get_db),
 ):
     email = email.strip().lower()
-    if not _EMAIL_RE.match(email):
+    if len(email) > 254 or not _EMAIL_RE.match(email):  # RFC max + ReDoS guard
         return err("invalid_email", "Enter a valid email address.", status_code=422)
     if len(password) < _MIN_PASSWORD:
         return err("weak_password",
@@ -76,7 +81,7 @@ def signup(
     return resp
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit("login", 10, 60))])
 def login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     email = email.strip().lower()
     user = db.query(User).filter(User.email == email).one_or_none()

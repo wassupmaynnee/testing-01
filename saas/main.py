@@ -10,6 +10,16 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
+from .observability import (
+    BodySizeLimitMiddleware,
+    RequestContextMiddleware,
+    log_event,
+    SecurityHeadersMiddleware,
+    configure_logging,
+    instrument_metrics,
+    scrub_event,
+)
+from .ratelimit import _RateLimited, rate_limit_handler
 from .responses import err
 from .routers import auth, billing, clips, jobs, publish, referrals, stream
 from .worker import start_worker
@@ -29,6 +39,7 @@ def _init_sentry() -> None:
         environment=settings.app_env,
         traces_sample_rate=settings.sentry_traces_sample_rate,
         send_default_pii=False,
+        before_send=scrub_event,
     )
 
 
@@ -43,7 +54,21 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     _init_sentry()
-    app = FastAPI(title=f"{settings.app_name} SaaS", version="0.1.0", lifespan=lifespan)
+    configure_logging()
+    _prod = settings.app_env == "production"
+    app = FastAPI(
+        title=f"{settings.app_name} SaaS", version="0.1.0", lifespan=lifespan,
+        docs_url=None if _prod else "/docs",
+        redoc_url=None if _prod else "/redoc",
+        openapi_url=None if _prod else "/openapi.json",
+    )
+
+    # Web-layer hardening + request tracing (outermost first).
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
+    app.add_middleware(RequestContextMiddleware)
+    app.add_exception_handler(_RateLimited, rate_limit_handler)
+    instrument_metrics(app)
 
     # Multi-router surface — pinned FastAPI keeps every include_router sub-route.
     app.include_router(auth.router)
@@ -62,19 +87,42 @@ def create_app() -> FastAPI:
 
     @app.get("/ready")
     def ready():
-        """Readiness: confirms Postgres is reachable so the deploy host can gate traffic."""
+        """Readiness: Postgres + Redis (+ R2 when configured) reachable, so the
+        deploy host / Caddy can gate traffic until dependencies are up."""
         from sqlalchemy import text
 
         from .db import engine
+        checks, healthy = {}, True
         try:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
-            return {"ok": True, "data": {"status": "ready", "db": "up"}}
+            checks["db"] = "up"
         except Exception as exc:  # noqa: BLE001
-            return JSONResponse(
-                {"ok": False, "error": {"code": "not_ready", "message": str(exc)}},
-                status_code=503,
-            )
+            log_event("readiness: db down", level=40, error=str(exc))
+            checks["db"] = "down"
+            healthy = False
+        try:
+            import redis
+            redis.Redis.from_url(settings.redis_url, socket_connect_timeout=2).ping()
+            checks["redis"] = "up"
+        except Exception as exc:  # noqa: BLE001
+            log_event("readiness: redis down", level=40, error=str(exc))
+            checks["redis"] = "down"
+            healthy = False
+        if settings.r2_enabled:
+            try:
+                from .storage import _client
+                _client().head_bucket(Bucket=settings.r2_bucket)
+                checks["r2"] = "up"
+            except Exception as exc:  # noqa: BLE001
+                log_event("readiness: r2 down", level=40, error=str(exc))
+                checks["r2"] = "down"
+                healthy = False
+        if healthy:
+            return {"ok": True, "data": {"status": "ready", **checks}}
+        return JSONResponse(
+            {"ok": False, "error": {"code": "not_ready", "message": "dependency down",
+                                    "checks": checks}}, status_code=503)
 
     @app.get("/")
     def index():
@@ -120,6 +168,18 @@ def create_app() -> FastAPI:
         }
         return Response(f"window.CLIPPIFY_CONFIG={json.dumps(cfg)};",
                         media_type="application/javascript")
+
+    from fastapi import HTTPException
+
+    @app.exception_handler(HTTPException)
+    async def http_exc_envelope(request, exc: HTTPException):  # noqa: ANN001
+        """Render HTTPExceptions (401 auth, etc.) in the frozen {ok,error}
+        envelope instead of FastAPI's default {"detail": ...}."""
+        detail = exc.detail if isinstance(exc.detail, str) else "request_failed"
+        code = detail if detail.replace("_", "").isalnum() else "error"
+        return JSONResponse(
+            {"ok": False, "error": {"code": code, "message": detail}},
+            status_code=exc.status_code, headers=getattr(exc, "headers", None))
 
     @app.exception_handler(404)
     async def not_found(request, exc):  # noqa: ANN001
