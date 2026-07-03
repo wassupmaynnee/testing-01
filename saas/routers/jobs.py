@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 
 from fastapi import APIRouter, Depends, Form, UploadFile
 from sqlalchemy.orm import Session
@@ -60,9 +59,21 @@ def create_job(
     db.add(job)
     db.flush()
 
-    dest = settings.uploads_dir / f"{job.id}{ext}"
+    dest = settings.uploads_dir / f"{job.id}{ext}"  # server-generated name (no traversal)
+    max_bytes = settings.max_upload_mb * 1024 * 1024
+    written = 0
     with dest.open("wb") as out:
-        shutil.copyfileobj(file.file, out)
+        while chunk := file.file.read(1024 * 1024):
+            written += len(chunk)
+            if written > max_bytes:
+                out.close()
+                dest.unlink(missing_ok=True)
+                db.delete(job)
+                db.commit()
+                return err("file_too_large",
+                           f"File exceeds the {settings.max_upload_mb} MB limit.",
+                           status_code=413)
+            out.write(chunk)
     job.source_ref = str(dest)
     db.commit()
 

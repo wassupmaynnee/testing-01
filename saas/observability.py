@@ -100,6 +100,26 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     "latency_ms": latency_ms, "user_id": user_id_ctx.get()}})
 
 
+class BodySizeLimitMiddleware(BaseHTTPMiddleware):
+    """Reject oversized request bodies early (API4 — resource consumption). The
+    reverse proxy caps at the edge too; this is defence in depth. Uploads use
+    their own larger cap enforced in the jobs router."""
+
+    def __init__(self, app: ASGIApp, max_bytes: int = 2_000_000) -> None:
+        super().__init__(app)
+        self._max = max_bytes
+
+    async def dispatch(self, request, call_next):
+        # Multipart uploads are size-checked in the jobs router (larger cap);
+        # everything else is small JSON/form and capped here.
+        cl = request.headers.get("content-length")
+        ctype = request.headers.get("content-type", "")
+        if cl and not ctype.startswith("multipart/") and int(cl) > self._max:
+            from .responses import err
+            return err("payload_too_large", "Request body too large.", status_code=413)
+        return await call_next(request)
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Baseline web-layer hardening. HSTS only in production (prod is HTTPS)."""
 

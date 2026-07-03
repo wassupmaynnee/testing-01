@@ -52,7 +52,10 @@
     // Continue-to-checkout support: /signup?tier=pro lands the new user straight
     // into Stripe Checkout for that tier once the account is created.
     const params = new URLSearchParams(location.search);
-    const nextTier = params.get("tier");
+    // Allowlist the tier param — it flows into the DOM, so never trust raw input.
+    const TIERS = ["free", "starter", "pro", "scale"];
+    const rawTier = (params.get("tier") || "").toLowerCase();
+    const nextTier = TIERS.includes(rawTier) ? rawTier : null;
     const nextInterval = params.get("interval") === "monthly" ? "monthly" : "annual";
     // Refer-a-friend: /r/<code> redirects here with ?ref=<code>. The bonus is
     // granted on the first paid plan (never on signup alone).
@@ -65,9 +68,13 @@
       document.getElementById("lede").after(banner);
     }
     if (nextTier) {
-      document.getElementById("lede").innerHTML =
-        'Create your account to continue to <b style="color:var(--color-accent)">' +
-        nextTier.charAt(0).toUpperCase() + nextTier.slice(1) + '</b> checkout.';
+      const lede = document.getElementById("lede");
+      lede.textContent = "Create your account to continue to ";
+      const b = document.createElement("b");
+      b.style.color = "var(--color-accent)";
+      b.textContent = nextTier.charAt(0).toUpperCase() + nextTier.slice(1);
+      lede.appendChild(b);
+      lede.appendChild(document.createTextNode(" checkout."));
     }
 
     const form = document.getElementById("signup-form");

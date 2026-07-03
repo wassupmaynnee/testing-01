@@ -11,6 +11,7 @@ from ..billing_core import (
 )
 from ..deps import current_user
 from ..models import User
+from ..observability import log_event
 from ..responses import deferred, err, ok
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -35,10 +36,11 @@ def checkout(
         return deferred("Stripe checkout", "set STRIPE_SECRET_KEY to enable billing")
     try:
         return ok(create_checkout_session(user.id, tier, interval))
-    except ValueError as exc:
-        return err("bad_tier", str(exc), status_code=400)
+    except ValueError:
+        return err("bad_tier", "That plan is not available.", status_code=400)
     except Exception as exc:  # noqa: BLE001 — surface Stripe/network errors cleanly
-        return err("checkout_failed", f"Could not start checkout: {exc}", status_code=502)
+        log_event("checkout failed", level=40, error=str(exc))
+        return err("checkout_failed", "Could not start checkout. Please try again.", status_code=502)
 
 
 @router.post("/portal")
@@ -49,7 +51,8 @@ def portal(user: User = Depends(current_user)):
     try:
         return ok(create_billing_portal(user.id))
     except Exception as exc:  # noqa: BLE001
-        return err("portal_failed", f"Could not open billing portal: {exc}", status_code=502)
+        log_event("portal failed", level=40, error=str(exc))
+        return err("portal_failed", "Could not open the billing portal. Please try again.", status_code=502)
 
 
 @router.post("/webhook")
@@ -66,5 +69,6 @@ async def webhook(request: Request):
     except PermissionError:
         return err("bad_signature", "Stripe signature verification failed.", status_code=400)
     except Exception as exc:  # noqa: BLE001
-        return err("webhook_error", f"Webhook processing error: {exc}", status_code=400)
+        log_event("webhook error", level=40, error=str(exc))
+        return err("webhook_error", "Webhook could not be processed.", status_code=400)
     return ok(result)

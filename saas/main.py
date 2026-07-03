@@ -11,7 +11,9 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .observability import (
+    BodySizeLimitMiddleware,
     RequestContextMiddleware,
+    log_event,
     SecurityHeadersMiddleware,
     configure_logging,
     instrument_metrics,
@@ -53,10 +55,17 @@ def create_app() -> FastAPI:
     settings = get_settings()
     _init_sentry()
     configure_logging()
-    app = FastAPI(title=f"{settings.app_name} SaaS", version="0.1.0", lifespan=lifespan)
+    _prod = settings.app_env == "production"
+    app = FastAPI(
+        title=f"{settings.app_name} SaaS", version="0.1.0", lifespan=lifespan,
+        docs_url=None if _prod else "/docs",
+        redoc_url=None if _prod else "/redoc",
+        openapi_url=None if _prod else "/openapi.json",
+    )
 
     # Web-layer hardening + request tracing (outermost first).
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(RequestContextMiddleware)
     app.add_exception_handler(_RateLimited, rate_limit_handler)
     instrument_metrics(app)
@@ -89,14 +98,16 @@ def create_app() -> FastAPI:
                 conn.execute(text("SELECT 1"))
             checks["db"] = "up"
         except Exception as exc:  # noqa: BLE001
-            checks["db"] = f"down: {exc}"
+            log_event("readiness: db down", level=40, error=str(exc))
+            checks["db"] = "down"
             healthy = False
         try:
             import redis
             redis.Redis.from_url(settings.redis_url, socket_connect_timeout=2).ping()
             checks["redis"] = "up"
         except Exception as exc:  # noqa: BLE001
-            checks["redis"] = f"down: {exc}"
+            log_event("readiness: redis down", level=40, error=str(exc))
+            checks["redis"] = "down"
             healthy = False
         if settings.r2_enabled:
             try:
@@ -104,7 +115,8 @@ def create_app() -> FastAPI:
                 _client().head_bucket(Bucket=settings.r2_bucket)
                 checks["r2"] = "up"
             except Exception as exc:  # noqa: BLE001
-                checks["r2"] = f"down: {exc}"
+                log_event("readiness: r2 down", level=40, error=str(exc))
+                checks["r2"] = "down"
                 healthy = False
         if healthy:
             return {"ok": True, "data": {"status": "ready", **checks}}

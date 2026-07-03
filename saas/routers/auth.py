@@ -43,7 +43,7 @@ def signup(
     db: Session = Depends(get_db),
 ):
     email = email.strip().lower()
-    if not _EMAIL_RE.match(email):
+    if len(email) > 254 or not _EMAIL_RE.match(email):  # RFC max + ReDoS guard
         return err("invalid_email", "Enter a valid email address.", status_code=422)
     if len(password) < _MIN_PASSWORD:
         return err("weak_password",
