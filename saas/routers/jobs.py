@@ -10,6 +10,7 @@ from ..db import get_db
 from ..deps import current_user
 from ..models import IngestKind, Job, JobStatus, User
 from ..pipeline.ingest_url import is_youtube_url
+from ..ratelimit import rate_limit
 from ..responses import err, ok
 from ..sse import enqueue_job
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 _ALLOWED = {".mp4", ".mov", ".m4v", ".webm", ".mkv"}
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(rate_limit("generate", 20, 60))])
 def create_job(
     file: UploadFile | None = None,
     url: str | None = Form(None),

@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import threading
 
+import logging
+
+from .observability import log_event
 from .pipeline.orchestrator import SinglePassStrategy
 from .sse import dequeue_job
 
@@ -16,15 +19,15 @@ _lock = threading.Lock()
 
 def _loop() -> None:
     strategy = SinglePassStrategy()
-    print("[worker] started; waiting for jobs")
+    log_event("worker started; waiting for jobs")
     while True:
         try:
             job_id = dequeue_job(timeout=5)
             if job_id:
-                print(f"[worker] picked up job {job_id}")
+                log_event("worker picked up job", job_id=job_id)
                 strategy.run(job_id)
         except Exception as exc:  # noqa: BLE001 — keep the worker alive
-            print(f"[worker] loop error: {exc}")
+            log_event("worker loop error", level=logging.ERROR, error=str(exc))
 
 
 def start_worker() -> None:

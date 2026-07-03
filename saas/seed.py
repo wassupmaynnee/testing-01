@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from .config import get_settings
+from .observability import log_event
 from .db import SessionLocal
 from .models import CreditLedger, User
 from .security import hash_password
@@ -13,7 +14,7 @@ def seed() -> None:
     try:
         existing = db.query(User).filter(User.email == s.seed_user_email).one_or_none()
         if existing:
-            print(f"[seed] user {s.seed_user_email} already exists")
+            log_event("seed user already exists")
             return
         user = User(
             email=s.seed_user_email,
@@ -24,7 +25,7 @@ def seed() -> None:
         db.flush()
         db.add(CreditLedger(user_id=user.id, delta=s.seed_user_credits, reason="signup_trial"))
         db.commit()
-        print(f"[seed] created {s.seed_user_email} with {s.seed_user_credits} credits")
+        log_event("seed user created", credits=s.seed_user_credits)
     finally:
         db.close()
 

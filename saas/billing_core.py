@@ -26,6 +26,7 @@ import time
 from dataclasses import dataclass
 
 from .config import get_settings
+from .observability import CREDIT_TXNS, WEBHOOKS, metric_inc
 
 
 @dataclass(frozen=True)
@@ -291,6 +292,7 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
     router maps it to the {ok, data} envelope.
     """
     if not verify_webhook_signature(payload, sig_header):
+        metric_inc(WEBHOOKS, result="rejected")
         raise PermissionError("invalid Stripe signature")
 
     event = json.loads(payload.decode("utf-8"))
@@ -306,6 +308,7 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
     try:
         # Idempotency gate — already processed?
         if db.get(StripeEvent, event_id) is not None:
+            metric_inc(WEBHOOKS, result="duplicate")
             return {"status": "duplicate", "eventId": event_id, "type": event_type}
 
         granted = 0
@@ -331,6 +334,7 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
                     user_id=user.id, delta=granted,
                     reason=f"stripe:{tier.key}:{event_id}",
                 ))
+                metric_inc(CREDIT_TXNS, kind="stripe_grant")
                 target_user_id = user.id
 
                 # Referral reward — fires once, on the referred user's FIRST
@@ -370,6 +374,7 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
             user_id=target_user_id, credits_granted=granted,
         ))
         db.commit()
+        metric_inc(WEBHOOKS, result="processed")
         return {
             "status": "granted" if granted else "ignored",
             "eventId": event_id, "type": event_type, "credits": granted,
