@@ -7,7 +7,7 @@ pydantic-settings>=2.4,<3
 
 # --- Data layer (PostgreSQL 16 system of record) ---
 SQLAlchemy>=2.0,<2.1
-alembic>=1.13,<2
+alembic>=1.18.5,<2
 psycopg[binary]>=3.2,<4
 
 # --- Broker / SSE transport ---
