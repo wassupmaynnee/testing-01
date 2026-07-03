@@ -1,0 +1,58 @@
+# Clippify — production Caddy config.
+# Caddy is the ONLY native service on the droplet: it terminates TLS (automatic
+# HTTPS via Let's Encrypt), reverse-proxies everything to the Dockerized app on
+# 127.0.0.1:8011 (single-origin — the app serves its own frontend + /api), caps
+# request bodies, and compresses responses.
+#
+# Set your domain below, then: `caddy validate --config Caddyfile` and
+# `sudo caddy reload --config /etc/caddy/Caddyfile`.
+#
+# ── Edit this line ──────────────────────────────────────────────────────────
+{$CLIPPIFY_DOMAIN:clippify.example.com} {
+
+	encode zstd gzip
+
+	# Body cap at the edge (defense in depth; the app also enforces its own
+	# limits + a 500 MB streaming upload cap). Large enough for video uploads.
+	request_body {
+		max_size 550MB
+	}
+
+	# The app (saas/observability.py:SecurityHeadersMiddleware) already emits
+	# CSP / X-Frame-Options / X-Content-Type-Options / Referrer-Policy /
+	# Permissions-Policy / HSTS. We do NOT duplicate them here (duplicate CSP
+	# headers are harmful). Uncomment ONLY if you terminate in front of a
+	# different backend that doesn't set them:
+	#
+	# header {
+	#	Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	#	X-Content-Type-Options "nosniff"
+	#	X-Frame-Options "DENY"
+	#	Referrer-Policy "strict-origin-when-cross-origin"
+	#	Content-Security-Policy "default-src 'self'; ..."
+	#	-Server
+	# }
+
+	reverse_proxy 127.0.0.1:8011 {
+		# Caddy forwards X-Forwarded-For/Proto by default. Long timeouts because
+		# clip generation streams SSE for a while.
+		transport http {
+			read_timeout 300s
+			write_timeout 300s
+		}
+	}
+
+	# SSE endpoint must not be buffered.
+	@sse path /api/stream/*
+	reverse_proxy @sse 127.0.0.1:8011 {
+		flush_interval -1
+	}
+
+	log {
+		output file /var/log/caddy/clippify.log {
+			roll_size 50MB
+			roll_keep 5
+		}
+		format json
+	}
+}
