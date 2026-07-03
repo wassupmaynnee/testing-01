@@ -31,6 +31,11 @@ const AppState = {
   publish: { enabled: false, accounts: [] }, // OAuth publish destinations
   clipsOffset: 0,    // pagination cursor for the clip library
   clipsTotal: 0,     // total clips owned by the user
+  optimisticJob: null, // {startedAt, failed, stalled, error} — processing card
+  lastSubmit: null,    // {type:'url'|'file', url?} for one-click Retry
+  heartbeat: null,     // SSE staleness watchdog
+  lastEventAt: 0,
+  referrals: null,
 };
 
 const CLIPS_PAGE = 12;
@@ -46,6 +51,110 @@ async function api(path, opts = {}) {
 }
 
 const $ = (id) => document.getElementById(id);
+
+/* ===========================================================================
+   Client cache — stale-while-revalidate with localStorage persistence.
+   Cached revisits render instantly; a background refetch then reconciles.
+   Whitelist only (never tokens/secrets — the session lives in the httpOnly
+   mf_session cookie, which JS can't read anyway).
+   ========================================================================= */
+const CACHE_NS = "clippify.cache.v1";
+const CACHE_TTLS = { me: 60_000, clips: 30_000, publish: 60_000, analytics: 60_000, referrals: 60_000 };
+const CACHE_PERSIST = new Set(["me", "clips", "publish", "referrals"]); // analytics stays session-only
+const Cache = {
+  _mem: {},
+  _load() {
+    if (this._loaded) return;
+    this._loaded = true;
+    try {
+      const raw = JSON.parse(localStorage.getItem(CACHE_NS)) || {};
+      for (const k of Object.keys(raw)) if (CACHE_PERSIST.has(k)) this._mem[k] = raw[k];
+    } catch (_) { /* corrupt cache -> cold start */ }
+  },
+  _save() {
+    const out = {};
+    for (const k of Object.keys(this._mem)) if (CACHE_PERSIST.has(k)) out[k] = this._mem[k];
+    try { localStorage.setItem(CACHE_NS, JSON.stringify(out)); } catch (_) { /* quota */ }
+  },
+  get(key) {
+    this._load();
+    const e = this._mem[key];
+    if (!e) return { data: null, fresh: false };
+    return { data: e.data, fresh: Date.now() - e.t < (CACHE_TTLS[key] || 30_000) };
+  },
+  set(key, data) { this._load(); this._mem[key] = { data, t: Date.now() }; this._save(); },
+  invalidate(...keys) {
+    this._load();
+    for (const k of keys) delete this._mem[k];
+    this._save();
+  },
+};
+
+/* --- animated count-up for the credits badge --- */
+let _lastCredits = null;
+function setCredits(n) {
+  const el = $("credits");
+  if (!el) return;
+  const from = _lastCredits;
+  _lastCredits = n;
+  if (from === null || from === n || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    el.textContent = n;
+    return;
+  }
+  const t0 = performance.now(), dur = 500;
+  (function step(t) {
+    const p = Math.min((t - t0) / dur, 1);
+    el.textContent = Math.round(from + (n - from) * p);
+    if (p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
+/* ===========================================================================
+   Tooltip engine — one delegated primitive for every [data-tip] control.
+   Hover + keyboard focus, 300ms delay, aria-describedby, never blocks clicks.
+   ========================================================================= */
+(function tooltips() {
+  const tip = document.createElement("div");
+  tip.id = "tt";
+  tip.setAttribute("role", "tooltip");
+  tip.style.cssText =
+    "position:fixed; z-index:90; max-width:240px; padding:6px 10px; border-radius:8px;" +
+    "font-size:12px; line-height:1.35; background:rgba(10,10,10,.95); color:#fff;" +
+    "border:1px solid rgba(255,255,255,.14); pointer-events:none; opacity:0;" +
+    "transition:opacity .15s; visibility:hidden";
+  document.addEventListener("DOMContentLoaded", () => document.body.appendChild(tip));
+  let timer = null, current = null;
+  function show(el) {
+    const text = el.getAttribute("data-tip");
+    if (!text) return;
+    tip.textContent = text;
+    tip.style.visibility = "visible";
+    const r = el.getBoundingClientRect();
+    tip.style.left = Math.max(8, Math.min(r.left + r.width / 2 - 120, innerWidth - 248)) + "px";
+    tip.style.top = (r.top > 60 ? r.top - tip.offsetHeight - 8 : r.bottom + 8) + "px";
+    tip.style.opacity = "1";
+    el.setAttribute("aria-describedby", "tt");
+    current = el;
+  }
+  function hide() {
+    clearTimeout(timer);
+    tip.style.opacity = "0";
+    tip.style.visibility = "hidden";
+    if (current) { current.removeAttribute("aria-describedby"); current = null; }
+  }
+  for (const [enter, leave] of [["mouseover", "mouseout"], ["focusin", "focusout"]]) {
+    document.addEventListener(enter, (e) => {
+      const el = e.target.closest("[data-tip]");
+      if (!el || el === current) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => show(el), 300);
+    });
+    document.addEventListener(leave, (e) => {
+      if (e.target.closest("[data-tip]")) hide();
+    });
+  }
+  document.addEventListener("scroll", hide, true);
+})();
 
 function toast(message, kind = "ok") {
   const t = $("toast");
@@ -64,10 +173,10 @@ function renderUser() {
     bar.innerHTML =
       `<span class="muted" style="margin-right:12px">${AppState.user.email}</span>` +
       `<span class="chip" style="margin-right:10px">${tier}</span>` +
-      `<a class="btn" href="/#pricing">Upgrade</a>` +
-      `<button class="btn" data-action="billing-portal">Billing</button>` +
-      `<button class="btn" data-action="logout">Sign out</button>`;
-    $("credits").textContent = AppState.user.credits;
+      `<a class="btn" href="/#pricing" data-tip="More credits every month">Upgrade</a>` +
+      `<button class="btn" data-action="billing-portal" data-tip="Manage or cancel your plan">Billing</button>` +
+      `<button class="btn" data-action="logout" data-tip="Sign out of Clippify">Sign out</button>`;
+    setCredits(AppState.user.credits);
   } else {
     bar.innerHTML = "";
   }
@@ -226,14 +335,29 @@ function renderPublish() {
 
 // --- data loaders ---
 async function loadMe() {
-  try { AppState.user = await api("/api/auth/me"); }
-  catch { AppState.user = null; }
+  // SWR: hydrate instantly from the persisted cache, then revalidate. A page
+  // refresh never logs the user out or renders cold — the httpOnly session
+  // cookie is verified by the background /me call.
+  const cached = Cache.get("me");
+  if (cached.data && !AppState.user) {
+    AppState.user = cached.data;
+    renderUser();
+    renderOnboarding();
+  }
+  try {
+    AppState.user = await api("/api/auth/me");
+    Cache.set("me", AppState.user);
+  } catch {
+    AppState.user = null;
+    Cache.invalidate("me", "clips", "publish", "referrals");
+  }
   renderUser();
   if (AppState.user) {
     await refreshJobs();
     await loadPublish();
     await loadClips(true);
     await loadAnalytics(false);
+    await loadReferrals();
     renderOnboarding();
     await loadSample();
   }
@@ -250,19 +374,37 @@ function librarySkeleton() {
 }
 
 async function loadClips(reset = false) {
-  if (reset) { AppState.clipsOffset = 0; librarySkeleton(); }
+  if (reset) {
+    AppState.clipsOffset = 0;
+    // SWR: cached first page renders instantly; skeleton only on a cold cache.
+    const cached = Cache.get("clips");
+    if (cached.data) {
+      AppState.clipsTotal = cached.data.total;
+      renderClipLibrary(cached.data.items, false);
+      if (cached.fresh) { AppState.clipsOffset = cached.data.items.length; return finishClipChrome(); }
+    } else {
+      librarySkeleton();
+    }
+  }
   let data;
   try {
     data = await api(`/api/clips?limit=${CLIPS_PAGE}&offset=${AppState.clipsOffset}`);
   } catch (e) {
     toast(`Could not load your clips: ${e.message}`, "err");
     const box = $("clip-library");
-    if (box && reset) box.innerHTML = '<p class="faint">Could not load clips — try refreshing.</p>';
+    if (box && reset && !Cache.get("clips").data) {
+      box.innerHTML = '<p class="faint">Could not load clips — try refreshing.</p>';
+    }
     return;
   }
+  if (reset) Cache.set("clips", data);
   AppState.clipsTotal = data.total;
   renderClipLibrary(data.items, !reset);
   AppState.clipsOffset += data.items.length;
+  finishClipChrome();
+}
+
+function finishClipChrome() {
   const more = $("load-more-clips");
   if (more) more.classList.toggle("hidden", AppState.clipsOffset >= AppState.clipsTotal);
   const total = $("clips-total");
@@ -299,8 +441,11 @@ function renderClipLibrary(items, append) {
     card.setAttribute("aria-label", `Open clip: ${c.title}`);
     card.innerHTML = media +
       `<div class="row" style="justify-content:space-between; align-items:center; margin-top:8px; gap:8px">` +
-      `<span class="faint" style="font-size:12px">${src} · ${when}${c.featured ? " · <b style='color:var(--color-accent-hot)'>featured</b>" : ""}</span>` +
-      `<a class="btn" href="${c.downloadUrl}" data-action="download" download style="min-height:36px; padding:6px 12px">↓</a></div>`;
+      `<span class="faint" style="font-size:12px">${src} · ${when}</span>` +
+      `<span class="row" style="gap:6px">` +
+      `<button class="btn" data-action="toggle-feature" data-clip="${c.id}" data-on="${c.featured}" ` +
+      `data-tip="Show this clip on the public homepage" style="min-height:36px; padding:6px 10px; font-size:11px">${c.featured ? "★ featured" : "☆ feature"}</button>` +
+      `<a class="btn" href="${c.downloadUrl}" data-action="download" data-tip="Download the MP4" download style="min-height:36px; padding:6px 12px">↓</a></span></div>`;
     box.appendChild(card);
   }
 }
@@ -314,6 +459,46 @@ async function openClipDetail(clipId) {
   renderClip();
   const pane = $("clip-box");
   if (pane) pane.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+// --- Referrals: my link, statuses, credits earned ---
+async function loadReferrals() {
+  const box = $("referral-body");
+  if (!box) return;
+  const cached = Cache.get("referrals");
+  if (cached.data) { AppState.referrals = cached.data; renderReferrals(); if (cached.fresh) return; }
+  else box.innerHTML = '<div style="height:56px; border-radius:10px; background:linear-gradient(110deg, rgba(255,255,255,.05) 30%, rgba(255,255,255,.12) 50%, rgba(255,255,255,.05) 70%); background-size:200% 100%; animation:shimmer 1.2s linear infinite" aria-hidden="true"></div>';
+  try {
+    AppState.referrals = await api("/api/referrals");
+    Cache.set("referrals", AppState.referrals);
+  } catch (e) {
+    box.innerHTML = `<p class="faint">Could not load referrals: ${e.message}</p>`;
+    return;
+  }
+  renderReferrals();
+}
+
+function renderReferrals() {
+  const box = $("referral-body");
+  const r = AppState.referrals;
+  if (!box || !r) return;
+  const rows = (r.referrals || []).map((x) => {
+    const status = x.status === "credited"
+      ? `<span class="status-tag status-completed">credited</span>`
+      : `<span class="status-tag status-queued">pending</span>`;
+    return `<div class="row" style="justify-content:space-between; padding:8px 0; border-top:1px solid var(--glass-border); font-size:13px">` +
+           `<span>${x.email}</span>${status}<span>${x.creditsEarned ? "+" + x.creditsEarned : "—"}</span></div>`;
+  }).join("");
+  box.innerHTML =
+    `<div class="row" style="gap:8px; flex-wrap:wrap; align-items:center">` +
+    `<input id="referral-link" readonly value="${r.link}" aria-label="Your referral link" ` +
+    `style="flex:1; min-width:200px; min-height:44px; padding:8px 12px; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,.03); color:var(--color-text); font-size:13px" />` +
+    `<button class="btn btn-accent" data-action="copy-referral" data-tip="Copy your invite link" style="min-height:44px">Copy link</button></div>` +
+    `<p class="faint" style="font-size:12px; margin:10px 0 0">1. Share your link · 2. A friend signs up · 3. When they buy any plan you get <b style="color:var(--color-accent-hot)">+${r.rewards.referrer}</b> credits and they get <b style="color:var(--color-accent-hot)">+${r.rewards.referred}</b>.</p>` +
+    (rows
+      ? `<div style="margin-top:12px">${rows}</div>` +
+        `<p style="font-size:13px; margin-top:10px">Total earned: <b style="color:var(--color-accent-hot)">${r.totalEarned} credits</b></p>`
+      : `<p class="faint" style="font-size:13px; margin-top:12px">No referrals yet — your link is ready to share.</p>`);
 }
 
 // --- Feature C: connected-channel analytics ---
@@ -367,29 +552,101 @@ async function refreshJobs() {
   renderJobs();
 }
 
-// --- SSE: stages 0 -> 6 ---
+// --- Optimistic processing card: appears in the library the instant a job is
+// submitted, driven by SSE stages 0-6 (frozen labels) + elapsed time. ---
+function renderOptimisticCard() {
+  const box = $("clip-library");
+  if (!box) return;
+  let card = $("optimistic-card");
+  const job = AppState.optimisticJob;
+  if (!job) { if (card) card.remove(); return; }
+  if (!card) {
+    card = document.createElement("div");
+    card.id = "optimistic-card";
+    card.className = "glass";
+    card.style.cssText =
+      "padding:10px; border-radius:12px; border:1px solid var(--color-accent); " +
+      "animation: obpulse 1.6s ease-in-out infinite";
+    const first = box.firstChild;
+    box.insertBefore(card, first);
+  }
+  const elapsed = Math.round((Date.now() - job.startedAt) / 1000);
+  const pct = Math.round((AppState.progress || 0) * 100);
+  const label = job.failed
+    ? `<b style="color:var(--color-error)">Failed</b> — ${job.error || "pipeline error"}`
+    : job.stalled
+      ? "Still working… (no update for a bit — hang tight)"
+      : `${STEP_LABELS[AppState.stage] || "Queued"}`;
+  card.innerHTML =
+    `<div style="aspect-ratio:9/16; border-radius:8px; background:var(--color-surface-3); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; padding:12px; text-align:center">` +
+    (job.failed
+      ? `<div style="font-size:26px" aria-hidden="true">⚠️</div>` +
+        `<div style="font-size:13px">${label}</div>` +
+        `<button class="btn btn-accent" data-action="retry-job" data-tip="Run this video again" style="min-height:40px">Retry</button>`
+      : `<div class="bar" style="width:80%"><i style="width:${pct}%"></i></div>` +
+        `<div style="font-size:13px" aria-live="polite">${label}</div>` +
+        `<div class="faint" style="font-size:11px">${elapsed}s elapsed · ${pct}%</div>`) +
+    `</div>`;
+}
+
+// --- SSE: stages 0 -> 6, heartbeat-aware with resume-on-drop ---
 function connectStream(jobId) {
   if (AppState.sse) AppState.sse.close();
+  if (AppState.heartbeat) clearInterval(AppState.heartbeat);
   AppState.activeJobId = jobId;
-  const es = new EventSource(`/api/stream/${jobId}`);
-  AppState.sse = es;
-  es.onmessage = async (ev) => {
-    let p; try { p = JSON.parse(ev.data); } catch { return; }
-    AppState.stage = p.stage;
-    AppState.progress = p.progress;
-    renderStepper();
-    if (p.status === "completed") {
-      es.close(); AppState.sse = null;
-      toast("Clip ready!", "ok");
-      await openJob(jobId);
-      await loadMe();
-    } else if (p.status === "failed") {
-      es.close(); AppState.sse = null;
-      toast(`Pipeline failed: ${p.message}`, "err");
-      await refreshJobs();
-    }
+  AppState.lastEventAt = Date.now();
+
+  const open = () => {
+    const es = new EventSource(`/api/stream/${jobId}`);
+    AppState.sse = es;
+    es.onmessage = async (ev) => {
+      let p; try { p = JSON.parse(ev.data); } catch { return; }
+      AppState.lastEventAt = Date.now();
+      if (AppState.optimisticJob) { AppState.optimisticJob.stalled = false; }
+      AppState.stage = p.stage;
+      AppState.progress = p.progress;
+      renderStepper();
+      renderOptimisticCard();
+      if (p.status === "completed") {
+        es.close(); AppState.sse = null;
+        clearInterval(AppState.heartbeat);
+        AppState.optimisticJob = null;
+        renderOptimisticCard();
+        toast("Clips ready!", "ok");
+        Cache.invalidate("clips", "me");  // exact keys, never a blanket wipe
+        await openJob(jobId);
+        await loadMe();  // credits reconcile from the SERVER, never client math
+      } else if (p.status === "failed") {
+        es.close(); AppState.sse = null;
+        clearInterval(AppState.heartbeat);
+        if (AppState.optimisticJob) {
+          AppState.optimisticJob.failed = true;
+          AppState.optimisticJob.error = p.message;
+          renderOptimisticCard();
+        }
+        toast(`Pipeline failed: ${p.message}`, "err");
+        Cache.invalidate("clips", "me");
+        await refreshJobs();
+      }
+    };
+    es.onerror = () => {
+      // Browser auto-retries; if the stream is hard-closed, reconnect and
+      // resume from the last known stage rather than resetting to 0.
+      if (es.readyState === EventSource.CLOSED && AppState.activeJobId === jobId) {
+        setTimeout(() => { if (AppState.activeJobId === jobId) open(); }, 2000);
+      }
+    };
   };
-  es.onerror = () => { /* keep-alive gaps are expected; browser auto-retries */ };
+  open();
+
+  // Heartbeat: no event for 20s -> "still working…" on the optimistic card.
+  AppState.heartbeat = setInterval(() => {
+    if (AppState.optimisticJob && !AppState.optimisticJob.failed
+        && Date.now() - AppState.lastEventAt > 20_000) {
+      AppState.optimisticJob.stalled = true;
+      renderOptimisticCard();
+    }
+  }, 5000);
 }
 
 async function openJob(jobId) {
@@ -444,6 +701,9 @@ const actions = {
       const job = await api("/api/jobs", { method: "POST", body });
       toast("Uploaded — finding your best moments", "ok");
       markOnboarding("video");
+      AppState.lastSubmit = { type: "file" };
+      AppState.optimisticJob = { startedAt: Date.now() };
+      renderOptimisticCard();
       connectStream(job.id);
       await refreshJobs();
       await loadMe();
@@ -468,6 +728,9 @@ const actions = {
       const job = await api("/api/jobs", { method: "POST", body });
       toast("Link accepted — cutting your top moments", "ok");
       markOnboarding("video");
+      AppState.lastSubmit = { type: "url", url };
+      AppState.optimisticJob = { startedAt: Date.now() };
+      renderOptimisticCard();
       input.value = "";
       connectStream(job.id);
       await refreshJobs();
@@ -523,6 +786,52 @@ const actions = {
     const btn = $("analytics-refresh");
     if (btn) btn.disabled = true;
     try { await loadAnalytics(true); } finally { if (btn) btn.disabled = false; }
+  },
+
+  async "retry-job"() {
+    const last = AppState.lastSubmit;
+    AppState.optimisticJob = null;
+    renderOptimisticCard();
+    if (last && last.type === "url" && last.url) {
+      $("url-input").value = last.url;
+      await actions["submit-url"]();
+    } else if (last && last.type === "file" && AppState.file) {
+      await actions.upload();
+    } else {
+      toast("Re-select your video to retry.", "err");
+    }
+  },
+
+  async "copy-referral"() {
+    const input = $("referral-link");
+    if (!input) return;
+    try {
+      await navigator.clipboard.writeText(input.value);
+      toast("Invite link copied — go earn credits!", "ok");
+    } catch (_) {
+      input.select();
+      document.execCommand("copy");
+      toast("Invite link copied", "ok");
+    }
+  },
+
+  async "toggle-feature"(el) {
+    // Optimistic star flip; server response reconciles, error rolls back.
+    const id = el.dataset.clip;
+    const want = el.dataset.on !== "true";
+    el.dataset.on = String(want);
+    el.textContent = want ? "★ featured" : "☆ feature";
+    try {
+      const body = new FormData();
+      body.append("on", want);
+      const res = await api(`/api/clips/${id}/feature`, { method: "POST", body });
+      Cache.invalidate("clips");
+      toast(res.featured ? "On the public homepage now." : "Removed from the homepage.", "ok");
+    } catch (e) {
+      el.dataset.on = String(!want);  // roll back
+      el.textContent = !want ? "★ featured" : "☆ feature";
+      toast(e.message, "err");
+    }
   },
 
   "dismiss-onboarding"() {

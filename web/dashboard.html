@@ -41,6 +41,10 @@
     .toast.err { background: rgba(255,77,77,.15); border:1px solid var(--color-error); color:#ffd6d6; }
     .toast.ok { background: rgba(46,204,113,.15); border:1px solid var(--color-success); color:#d6ffe6; }
     @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+    @keyframes obpulse { 0%,100% { box-shadow: 0 0 0 0 rgba(255,122,0,.35); } 50% { box-shadow: 0 0 0 6px rgba(255,122,0,0); } }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
   </style>
 </head>
 <body>
@@ -81,10 +85,10 @@
           <div class="glass panel">
             <div class="row" style="justify-content:space-between; align-items:center">
               <h2 style="margin:0">New clip</h2>
-              <span class="credits muted">Credits: <b id="credits">–</b></span>
+              <span class="credits muted" data-tip="1 credit = 1 finished clip">Credits: <b id="credits">–</b></span> <a href="#referrals-panel" class="faint" data-tip="Invite friends, earn free credits" style="font-size:12px">Refer &amp; earn</a>
             </div>
             <p class="muted">Upload an MP4 or paste a YouTube URL — we find the moments worth posting.</p>
-            <div class="dropzone" data-action="choose-file" role="button" tabindex="0" aria-label="Choose an MP4 file to upload">
+            <div class="dropzone" data-action="choose-file" role="button" tabindex="0" aria-label="Choose an MP4 file to upload" data-tip="Pick a video from your computer">
               <div style="font-size:34px" aria-hidden="true">⬆</div>
               <div><b>Click to choose an MP4</b></div>
               <div class="faint" id="filename">No file selected</div>
@@ -93,7 +97,7 @@
             <p class="faint" style="font-size:12px; margin:10px 0 0" id="upload-cost" aria-live="polite">
               Cost: <b style="color:var(--color-accent-hot)">1 credit per finished clip</b> — you’ll see the exact count before anything is charged.
             </p>
-            <button class="btn btn-accent" data-action="upload" id="upload-btn" disabled
+            <button class="btn btn-accent" data-action="upload" id="upload-btn" data-tip="Render your best moments as clips" disabled
               style="width:100%; margin-top:12px; min-height:44px">Get my clips</button>
 
             <div class="row" style="align-items:center; gap:10px; margin:16px 0 10px">
@@ -109,7 +113,7 @@
               We’ll cut the <b>top <span id="clips-per-video">3</span> moments</b> into separate 9:16 clips —
               costs <b style="color:var(--color-accent-hot)">up to 3 credits</b> (1 per clip).
             </p>
-            <button class="btn btn-accent" data-action="submit-url" id="url-btn"
+            <button class="btn btn-accent" data-action="submit-url" id="url-btn" data-tip="Cut the top moments from this link"
               style="width:100%; margin-top:12px; min-height:44px">Get my clips from this link</button>
           </div>
 
@@ -139,7 +143,7 @@
               <video id="clip-video" controls playsinline></video>
               <div class="row" style="justify-content:space-between; align-items:center; margin-top:12px">
                 <span class="chip" id="clip-score" title="Engagement score — weighted mix of hook, pace, emotion, and face presence">★ score –</span>
-                <a class="btn btn-accent" id="download-link" data-action="download" download style="min-height:44px">Download</a>
+                <a class="btn btn-accent" id="download-link" data-action="download" data-tip="Save the finished MP4" download style="min-height:44px">Download</a>
               </div>
               <p class="faint" id="clip-why" style="font-size:12px; margin:8px 0 0"></p>
               <div class="signals" id="clip-signals"></div>
@@ -159,8 +163,8 @@
                 <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
                   <span class="faint" id="publish-status">Publishing: not connected</span>
                   <div class="row" style="gap:8px">
-                    <button class="btn hidden" data-action="connect-youtube" id="connect-yt-btn">Connect YouTube</button>
-                    <button class="btn btn-accent" data-action="publish-clip" id="publish-btn">Publish (private)</button>
+                    <button class="btn hidden" data-action="connect-youtube" id="connect-yt-btn" data-tip="Link your channel for private uploads">Connect YouTube</button>
+                    <button class="btn btn-accent" data-action="publish-clip" id="publish-btn" data-tip="Upload privately to your channel">Publish (private)</button>
                   </div>
                 </div>
                 <div class="faint" style="font-size:12px; margin-top:6px">
@@ -184,7 +188,7 @@
             <h3 style="margin:0">Your channel analytics</h3>
             <div class="row" style="gap:10px; align-items:center">
               <span class="faint" id="analytics-updated"></span>
-              <button class="btn" data-action="refresh-analytics" id="analytics-refresh">Refresh</button>
+              <button class="btn" data-action="refresh-analytics" id="analytics-refresh" data-tip="Pull the latest channel numbers">Refresh</button>
             </div>
           </div>
           <div id="analytics-body" class="faint" style="margin-top:12px">Connect YouTube to see analytics for your channel.</div>
@@ -198,7 +202,17 @@
           <div id="clip-library" style="margin-top:12px; display:grid; gap:12px; grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
             <p class="faint">Your rendered clips will appear here.</p>
           </div>
-          <button class="btn hidden" data-action="load-more-clips" id="load-more-clips" style="margin-top:14px; width:100%">Load more</button>
+          <button class="btn hidden" data-action="load-more-clips" id="load-more-clips" data-tip="Show more of your clips" style="margin-top:14px; width:100%">Load more</button>
+        </div>
+
+        <div class="glass panel" id="referrals-panel">
+          <div class="row" style="justify-content:space-between; align-items:center">
+            <h3 style="margin:0">Refer a friend, earn credits</h3>
+            <span class="chip" data-tip="Friends who subscribe earn you free clips">+100 credits each</span>
+          </div>
+          <div id="referral-body" style="margin-top:12px">
+            <p class="faint">Sign in to get your invite link.</p>
+          </div>
         </div>
       </div>
     </section>

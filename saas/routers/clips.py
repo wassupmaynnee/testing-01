@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Form
 from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -142,6 +142,24 @@ def clip_meta(clip_id: str, user: User = Depends(current_user), db: Session = De
     if not clip:
         return err("not_found", "Clip not found.", status_code=404)
     return ok(_clip_dict(clip, db.get(Job, clip.job_id)))
+
+
+@router.post("/{clip_id}/feature")
+def toggle_feature(
+    clip_id: str,
+    on: bool = Form(...),
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    """Owner-only: opt a clip in/out of the PUBLIC homepage showcase. Featuring
+    is the explicit act of making that clip publicly viewable."""
+    clip = _owned_clip(clip_id, user, db)
+    if not clip:
+        return err("not_found", "Clip not found.", status_code=404)
+    clip.featured = bool(on)
+    db.add(clip)
+    db.commit()
+    return ok({"id": clip.id, "featured": clip.featured})
 
 
 @router.get("/{clip_id}/thumb")
