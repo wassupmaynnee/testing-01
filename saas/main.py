@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
 from .responses import err
-from .routers import auth, billing, clips, jobs, publish, stream
+from .routers import auth, billing, clips, jobs, publish, referrals, stream
 from .worker import start_worker
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
@@ -52,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(stream.router)
     app.include_router(billing.router)
     app.include_router(publish.router)
+    app.include_router(referrals.router)
 
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
@@ -86,6 +87,13 @@ def create_app() -> FastAPI:
     @app.get("/dashboard")
     def dashboard():
         return FileResponse(str(WEB_DIR / "dashboard.html"))
+
+    @app.get("/r/{code}", include_in_schema=False)
+    def referral_link(code: str):
+        """Shareable refer-a-friend link -> signup with the code pre-applied."""
+        from fastapi.responses import RedirectResponse
+        safe = "".join(ch for ch in code if ch.isalnum())[:16]
+        return RedirectResponse(url=f"/signup?ref={safe}", status_code=303)
 
     # Root-level SEO/asset routes (also available under /static, but crawlers and
     # browsers expect these at the origin root).
