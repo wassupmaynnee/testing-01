@@ -20,7 +20,8 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 # Pragmatic email check — RFC-perfect validation is a rabbit hole; this rejects
 # the obvious garbage while accepting anything Stripe/Postgres will happily store.
-_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+# Bounded quantifiers (each segment length-capped) -> linear match, no ReDoS.
+_EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{1,255}$")
 _MIN_PASSWORD = 8
 
 

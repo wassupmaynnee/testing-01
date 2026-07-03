@@ -558,17 +558,31 @@
         card.className = "feed-card";
         card.setAttribute("role", "listitem");
         const ar = ASPECT_CSS[m.aspect] || "9/16";
-        card.innerHTML =
-          `<video src="${m.src}"${m.poster ? ` poster="${m.poster}"` : ""} preload="none" muted loop playsinline ` +
-          `controlslist="nodownload" style="aspect-ratio:${ar}" aria-label="${m.title} — showcase clip"></video>` +
-          `<span class="score" title="Engagement score (hook, pace, emotion, presence)">★ ${Number(m.score).toFixed(2)}</span>` +
-          `<div class="why">${m.label}</div>` +
-          `<button class="sound" type="button" aria-label="Toggle sound">🔇</button>`;
+        // Build with DOM APIs — clip titles/labels come from user video transcripts,
+        // so setAttribute/textContent (never innerHTML) prevents stored XSS.
+        const v = document.createElement("video");
+        v.src = m.src;                         // same-origin API/static URL
+        if (m.poster) v.poster = m.poster;
+        v.preload = "none"; v.muted = true; v.loop = true; v.playsInline = true;
+        v.setAttribute("controlslist", "nodownload");
+        v.style.aspectRatio = ar;
+        v.setAttribute("aria-label", `${m.title} — showcase clip`);  // attr = auto-escaped
+        const score = document.createElement("span");
+        score.className = "score";
+        score.title = "Engagement score (hook, pace, emotion, presence)";
+        score.textContent = `★ ${Number(m.score).toFixed(2)}`;
+        const why = document.createElement("div");
+        why.className = "why";
+        why.textContent = m.label || "";       // escaped
+        const sound = document.createElement("button");
+        sound.className = "sound"; sound.type = "button";
+        sound.setAttribute("aria-label", "Toggle sound");
+        sound.textContent = "🔇";
+        card.append(v, score, why, sound);
         feed.appendChild(card);
-        const v = card.querySelector("video");
-        card.querySelector(".sound").addEventListener("click", (e) => {
+        sound.addEventListener("click", () => {
           v.muted = !v.muted;
-          e.currentTarget.textContent = v.muted ? "🔇" : "🔊";
+          sound.textContent = v.muted ? "🔇" : "🔊";
           if (!v.muted) v.play().catch(() => {});
         });
       }
