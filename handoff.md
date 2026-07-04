@@ -12,7 +12,7 @@
 - **Broken/blocked:** `mcp__claude-in-chrome__list_connected_browsers` → `[]` (no Chrome extension connected) — the intended screenshot path is dead until the user connects a browser OR Playwright is installed. Neither Playwright nor a recording pipeline is set up yet. Nothing captured; `preview/` does not exist; `PREVIEW.md` not started.
 - **Untested:** production frontend build via local Caddy (stack serves web/ directly from the image — that IS the production way for this app; note this in PREVIEW.md instead of adding Caddy locally).
 - **Storage mode:** local `./data` volume (R2 env vars blank — no credentials exist). State this in the preview report.
-- **Stripe:** test key (`sk_test_…`) present in `clippify/.env` (gitignored); checkout creates real `cs_test_` sessions. `STRIPE_WEBHOOK_SECRET=whsec_localtest_forgedemo` (local forgery value used by QA scripts).
+- **Stripe:** test key (`sk_test_…`) present in `clippify/.env` (gitignored); checkout creates real `cs_test_` sessions. `STRIPE_WEBHOOK_SECRET` holds the local test-forgery value (see gitignored `.env`; QA scripts read the same value).
 - **Open PRs:** #23 `feat/deploy-kit` → main (unmerged, human's). 14 Dependabot PRs open (#8/#9 closed as frozen-pin violations).
 
 ## 3. Active Files
