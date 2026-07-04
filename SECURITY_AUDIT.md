@@ -43,7 +43,7 @@ XSS eliminated (zero `innerHTML` on user data paths; `tier` param allowlisted).
 **Secrets requiring rotation (owner action):**
 1. `STRIPE_SECRET_KEY` (`sk_test_…` in `.env`) — was pasted in chat; regenerate in the Stripe dashboard before production (and never reuse it as a live pattern).
 2. `APP_SECRET` — the generated value was surfaced in chat during deploy-kit handoff; generate a fresh one for production (`python -c "import secrets;print(secrets.token_urlsafe(48))"`).
-3. `whsec_localtest_forgedemo` — replace with the real Stripe endpoint secret at deploy (already the documented plan).
+3. The local-forgery `STRIPE_WEBHOOK_SECRET` value (in gitignored `.env`) — replace with the real Stripe endpoint secret at deploy (already the documented plan).
 
 ## C. Phase-3 environment posture
 
