@@ -35,24 +35,106 @@ def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def _hit(r, key: str, limit: int, window_s: int) -> None:
+    """Fixed-window increment; raises _RateLimited when over the limit."""
+    n = r.incr(key)
+    if n == 1:
+        r.expire(key, window_s)
+    if n > limit:
+        ttl = r.ttl(key)
+        raise _RateLimited(ttl if ttl and ttl > 0 else window_s)
+
+
 def rate_limit(bucket: str, limit: int, window_s: int):
     """FastAPI dependency factory: allow `limit` requests per `window_s` per IP."""
     def _dep(request: Request):
         ip = _client_ip(request)
-        key = f"clippify:rl:{bucket}:{ip}"
         try:
-            r = _client()
-            n = r.incr(key)
-            if n == 1:
-                r.expire(key, window_s)
-            if n > limit:
-                ttl = r.ttl(key)
-                raise _RateLimited(ttl if ttl and ttl > 0 else window_s)
+            _hit(_client(), f"clippify:rl:{bucket}:{ip}", limit, window_s)
         except _RateLimited:
             raise
         except Exception as exc:  # noqa: BLE001 — fail open on cache trouble
             log.warning("rate limiter degraded (fail-open): %s", exc)
     return _dep
+
+
+# --------------------------------------------------------------------------- #
+# Auth limiter — DUAL-KEY: per-IP AND per-account-identifier, both enforced.  #
+# 5 attempts / 15 min. The account key is a salted hash (never the raw email  #
+# in Redis), and the 429 is identical whether or not the account exists.      #
+# --------------------------------------------------------------------------- #
+AUTH_LIMIT = 5
+AUTH_WINDOW_S = 15 * 60
+
+
+def auth_rate_limit(bucket: str = "auth"):
+    """Dependency factory for login/token routes: 5 per 15 min per IP + per
+    account identifier (email). Reads the form field non-destructively (FastAPI
+    caches the parsed body, so the endpoint still receives it)."""
+    import hashlib
+
+    from fastapi import Form
+
+    def _dep(request: Request, email: str = Form(None)):
+        try:
+            r = _client()
+            ip = _client_ip(request)
+            _hit(r, f"clippify:rl:{bucket}:ip:{ip}", AUTH_LIMIT, AUTH_WINDOW_S)
+            if email:
+                acct = hashlib.sha256(f"clippify:{email.strip().lower()}".encode()).hexdigest()[:24]
+                _hit(r, f"clippify:rl:{bucket}:acct:{acct}", AUTH_LIMIT, AUTH_WINDOW_S)
+        except _RateLimited:
+            raise
+        except Exception as exc:  # noqa: BLE001 — fail open on cache trouble
+            log.warning("auth rate limiter degraded (fail-open): %s", exc)
+    return _dep
+
+
+# --------------------------------------------------------------------------- #
+# Global limiter — every endpoint, per IP. Generous ceiling; the point is     #
+# abuse/flood protection, not throttling real users. Infra probes and static  #
+# assets are exempt (Caddy fronts /static in production anyway).              #
+# --------------------------------------------------------------------------- #
+GLOBAL_LIMIT = 300
+GLOBAL_WINDOW_S = 60
+_EXEMPT_PREFIXES = ("/static",)
+_EXEMPT_PATHS = {"/health", "/ready", "/metrics"}
+
+
+class GlobalRateLimitMiddleware:
+    """Pure-ASGI global limiter (no BaseHTTPMiddleware overhead on every call)."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        path = scope.get("path", "")
+        if path in _EXEMPT_PATHS or path.startswith(_EXEMPT_PREFIXES):
+            return await self.app(scope, receive, send)
+        ip = "unknown"
+        for name, value in scope.get("headers", []):
+            if name == b"x-forwarded-for":
+                ip = value.decode().split(",")[0].strip()
+                break
+        else:
+            client = scope.get("client")
+            if client:
+                ip = client[0]
+        retry = None
+        try:
+            _hit(_client(), f"clippify:rl:global:{ip}", GLOBAL_LIMIT, GLOBAL_WINDOW_S)
+        except _RateLimited as exc:
+            retry = exc.retry_after
+        except Exception as exc:  # noqa: BLE001 — fail open
+            log.warning("global rate limiter degraded (fail-open): %s", exc)
+        if retry is not None:
+            resp = err("rate_limited", "Too many requests — please slow down.",
+                       status_code=429, retryAfter=retry)
+            resp.headers["Retry-After"] = str(retry)
+            return await resp(scope, receive, send)
+        return await self.app(scope, receive, send)
 
 
 class _RateLimited(Exception):

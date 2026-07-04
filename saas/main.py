@@ -19,7 +19,7 @@ from .observability import (
     instrument_metrics,
     scrub_event,
 )
-from .ratelimit import _RateLimited, rate_limit_handler
+from .ratelimit import GlobalRateLimitMiddleware, _RateLimited, rate_limit_handler
 from .responses import err
 from .routers import auth, billing, clips, jobs, publish, referrals, stream
 from .worker import start_worker
@@ -67,6 +67,9 @@ def create_app() -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(BodySizeLimitMiddleware)
     app.add_middleware(RequestContextMiddleware)
+    # Global per-IP limiter on every endpoint (auth routes add a stricter dual-key
+    # limit on top). Redis-backed: survives restarts, shared across workers.
+    app.add_middleware(GlobalRateLimitMiddleware)
     app.add_exception_handler(_RateLimited, rate_limit_handler)
     instrument_metrics(app)
 
@@ -170,6 +173,22 @@ def create_app() -> FastAPI:
                         media_type="application/javascript")
 
     from fastapi import HTTPException
+    from fastapi.exceptions import RequestValidationError
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_envelope(request, exc: RequestValidationError):  # noqa: ANN001
+        """422s in the frozen envelope. Reports WHICH fields failed and why —
+        but never echoes the submitted values back (no `input` reflection)."""
+        fields = [
+            {"field": ".".join(str(x) for x in e.get("loc", []) if x != "body"),
+             "issue": e.get("type", "invalid")}
+            for e in exc.errors()[:10]
+        ]
+        return JSONResponse(
+            {"ok": False, "error": {"code": "validation_error",
+                                    "message": "Invalid input.", "fields": fields}},
+            status_code=422)
+
 
     @app.exception_handler(HTTPException)
     async def http_exc_envelope(request, exc: HTTPException):  # noqa: ANN001

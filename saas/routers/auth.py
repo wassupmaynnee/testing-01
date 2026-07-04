@@ -12,7 +12,7 @@ from ..config import get_settings
 from ..db import get_db
 from ..deps import current_user
 from ..models import CreditLedger, Referral, User
-from ..ratelimit import rate_limit
+from ..ratelimit import auth_rate_limit, rate_limit
 from ..responses import err, ok
 from ..security import SESSION_COOKIE, hash_password, issue_session, verify_password
 
@@ -23,6 +23,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 # Bounded quantifiers (each segment length-capped) -> linear match, no ReDoS.
 _EMAIL_RE = re.compile(r"^[^@\s]{1,64}@[^@\s]{1,255}\.[^@\s]{1,255}$")
 _MIN_PASSWORD = 8
+_MAX_PASSWORD = 256  # cap before PBKDF2 (hash-DoS guard)
 
 
 def _issue_session_cookie(resp: JSONResponse, user_id: str) -> None:
@@ -46,9 +47,9 @@ def signup(
     email = email.strip().lower()
     if len(email) > 254 or not _EMAIL_RE.match(email):  # RFC max + ReDoS guard
         return err("invalid_email", "Enter a valid email address.", status_code=422)
-    if len(password) < _MIN_PASSWORD:
+    if len(password) < _MIN_PASSWORD or len(password) > _MAX_PASSWORD:
         return err("weak_password",
-                   f"Password must be at least {_MIN_PASSWORD} characters.", status_code=422)
+                   f"Password must be {_MIN_PASSWORD}-{_MAX_PASSWORD} characters.", status_code=422)
     if db.query(User).filter(User.email == email).one_or_none() is not None:
         return err("email_taken", "An account with that email already exists.", status_code=409)
 
@@ -82,7 +83,7 @@ def signup(
     return resp
 
 
-@router.post("/login", dependencies=[Depends(rate_limit("login", 10, 60))])
+@router.post("/login", dependencies=[Depends(auth_rate_limit("login"))])
 def login(email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
     email = email.strip().lower()
     user = db.query(User).filter(User.email == email).one_or_none()
