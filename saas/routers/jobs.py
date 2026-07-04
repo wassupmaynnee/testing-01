@@ -36,7 +36,7 @@ def create_job(
 
     # --- YouTube URL path ---
     if url:
-        if not is_youtube_url(url):
+        if len(url) > 2048 or not is_youtube_url(url):
             return err("bad_url", "Enter a valid YouTube URL.", status_code=400)
         job = Job(user_id=user.id, kind=IngestKind.youtube, source_ref=url.strip(),
                   status=JobStatus.queued)
