@@ -39,7 +39,7 @@ google-api-python-client>=2.130,<3
 # --- YouTube ingestion (Feature B). The sanctioned downloader named at
 # saas/pipeline/base.py; imported lazily in saas/pipeline/ingest_url.py so a
 # non-YouTube job never loads it. ---
-yt-dlp>=2026.6.9,<2027
+yt-dlp>=2026.7.4,<2027
 
 # --- Object storage (Cloudflare R2, S3-compatible). Imported lazily in
 # saas/storage.py only when R2_* env vars are set; otherwise clips persist to the
