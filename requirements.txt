@@ -20,7 +20,7 @@ stripe>=11,<13
 
 # --- Error & performance monitoring. Initialized only when SENTRY_DSN is set;
 # an absent DSN is a no-op, so the app boots identically without it. ---
-sentry-sdk[fastapi]>=2.0,<3
+sentry-sdk[fastapi]>=2.64.0,<3
 
 # --- Pipeline / render ---
 faster-whisper>=1.0,<2
